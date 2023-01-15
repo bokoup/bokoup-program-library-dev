@@ -29,3 +29,21 @@ object_relationships:
         remote_table:
           name: token_account
           schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - slot
+        - memo
+        - admin_settings
+        - authority
+        - mint
+        - payer
+        - platform
+        - promo
+        - promo_group
+        - signature
+        - token_account
+        - created_at
+        - modified_at
+      filter: {}

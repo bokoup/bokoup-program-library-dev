@@ -379,7 +379,7 @@ pub struct CreateNonFungible<'info> {
     pub authority: UncheckedAccount<'info>,
     #[account(init, payer = payer, mint::decimals = 0, mint::authority = authority, mint::freeze_authority = authority)]
     pub mint: Account<'info, Mint>,
-    #[account(init, payer = payer, associated_token::mint = mint, associated_token::authority = authority)]
+    #[account(init, payer = payer, associated_token::mint = mint, associated_token::authority = payer)]
     pub token_account: Account<'info, TokenAccount>,
     /// CHECK: checked via cpi
     #[account(mut)]

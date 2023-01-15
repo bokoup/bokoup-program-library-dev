@@ -1,0 +1,18 @@
+table:
+  name: promo_transactions
+  schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - slot
+        - memo
+        - authority
+        - mint
+        - payer
+        - promo
+        - promo_group
+        - signature
+        - token_account
+        - transaction_type
+      filter: {}
