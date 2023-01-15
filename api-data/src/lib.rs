@@ -388,6 +388,11 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
+        } else if table == "sign_memo" {
+            queries::bpl_token_metadata::sign_memo::upsert(
+                client, signature, accounts, data, slot,
+            )
+            .await;
         }
 
         let row = client

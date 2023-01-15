@@ -15,4 +15,5 @@
 - "!include public_promo.yaml"
 - "!include public_promo_group.yaml"
 - "!include public_purchase_receipt.yaml"
+- "!include public_sign_memo.yaml"
 - "!include public_token_account.yaml"
