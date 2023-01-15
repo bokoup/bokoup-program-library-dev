@@ -8,6 +8,7 @@ SET check_function_bodies = false;
 CREATE TABLE public.sign_memo (
     signature text NOT NULL,
     payer text NOT NULL,
+    signer text NOT NULL,
     memo jsonb,
     slot bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
