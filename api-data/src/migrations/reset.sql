@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS public.mint_promo_token CASCADE;
 DROP TABLE IF EXISTS public.promo CASCADE;
 DROP TABLE IF EXISTS public.promo_group CASCADE;
 DROP TABLE IF EXISTS public.sign_memo CASCADE;
+DROP TABLE IF EXISTS public.promo_transactions;
 
 -- =============================
 -- mpl_auction_house
