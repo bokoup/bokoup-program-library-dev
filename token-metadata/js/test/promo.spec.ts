@@ -9,10 +9,9 @@ const expect = chai.expect;
 import * as dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
-const process = require("process");
+const process = require('process');
 
 describe('promo', () => {
-
   const tokenOwnerProvider = anchor.AnchorProvider.env();
   // Configure the client to use the local cluster.
   // anchor.setProvider(provider);
@@ -26,26 +25,19 @@ describe('promo', () => {
 
   console.log(promoOwner.publicKey);
 
-
   const url = process.env.ANCHOR_PROVIDER_URL;
   if (url === undefined) {
-    throw new Error("ANCHOR_PROVIDER_URL is not defined");
+    throw new Error('ANCHOR_PROVIDER_URL is not defined');
   }
   const options = anchor.AnchorProvider.defaultOptions();
   const connection = new Connection(url, options.commitment);
-  const promoOwnerWallet = new anchor.Wallet(promoOwner)
+  const promoOwnerWallet = new anchor.Wallet(promoOwner);
 
-  const promoOwnerProvider = new anchor.AnchorProvider(
-    connection,
-    promoOwnerWallet,
-    options
-  )
+  const promoOwnerProvider = new anchor.AnchorProvider(connection, promoOwnerWallet, options);
 
   const tokenMetadataProgramPromoOwner = new TokenMetadataProgram(promoOwnerProvider);
 
-  const platform = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)),
-  );
+  const platform = Keypair.fromSecretKey(new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)));
   console.log('promoOwner: ', promoOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
 
@@ -62,25 +54,26 @@ describe('promo', () => {
   const groupMember1 = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.GROUP_MEMBER_1_KEYPAIR)),
   );
-  console.log("groupMember1", groupMember1.publicKey.toString())
+  console.log('groupMember1', groupMember1.publicKey.toString());
   const plaformSigner = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
   );
 
-  const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(new anchor.AnchorProvider(
-    connection,
-    new anchor.Wallet(groupMember1),
-    options
-  ));
+  const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(
+    new anchor.AnchorProvider(connection, new anchor.Wallet(groupMember1), options),
+  );
 
   let groupAccount: PromoGroup;
-
-
 
   it('funds accounts', async () => {
     const amount = 1_000_000_000;
     const transaction = new Transaction();
-    const addresses = [platform.publicKey, promoOwner.publicKey, groupMember1.publicKey, plaformSigner.publicKey];
+    const addresses = [
+      platform.publicKey,
+      promoOwner.publicKey,
+      groupMember1.publicKey,
+      plaformSigner.publicKey,
+    ];
     addresses.forEach((address) => {
       transaction.add(
         anchor.web3.SystemProgram.transfer({
@@ -114,12 +107,16 @@ describe('promo', () => {
   });
 
   it('creates group', async () => {
-
-    const members = [promoOwner.publicKey, groupMember1.publicKey, plaformSigner.publicKey]
+    const members = [promoOwner.publicKey, groupMember1.publicKey, plaformSigner.publicKey];
     const lamports = 500_000_000;
-    const memo = "Created a new group for bokoup store group";
+    const memo = 'Created a new group for bokoup store group';
 
-    [group] = await tokenMetadataProgramPromoOwner.createPromoGroup(groupSeed, members, lamports, memo);
+    [group] = await tokenMetadataProgramPromoOwner.createPromoGroup(
+      groupSeed,
+      members,
+      lamports,
+      memo,
+    );
 
     groupAccount = (await tokenMetadataProgram.program.account.promoGroup.fetch(
       group,
@@ -128,33 +125,30 @@ describe('promo', () => {
       promoOwner.publicKey.toString(),
       'Group incorrect.',
     );
-    console.log("accountOwner", promoOwner.publicKey.toString());
+    console.log('accountOwner', promoOwner.publicKey.toString());
 
-    console.log("groupAccount", groupAccount);
-    console.log("groupSeed", groupSeed);
+    console.log('groupAccount', groupAccount);
+    console.log('groupSeed', groupSeed);
 
-    const groupAccountInfo =
-      await tokenMetadataProgram.program.provider.connection.getAccountInfo(
-        group,
-      );
-
-    expect(groupAccountInfo?.lamports).to.equal(
-      503626160,
-      'Group lamports incorrect.',
+    const groupAccountInfo = await tokenMetadataProgram.program.provider.connection.getAccountInfo(
+      group,
     );
 
-    console.log("groupAccountInfo", groupAccountInfo);
-  });
+    expect(groupAccountInfo?.lamports).to.equal(503626160, 'Group lamports incorrect.');
 
+    console.log('groupAccountInfo', groupAccountInfo);
+  });
 
   it('transfers cpi', async () => {
-    tokenMetadataProgramPromoOwner.program.methods.transferCpi(1_000_000).accounts({
-      group,
-      platform: adminSettingsAccount.platform,
-      adminSettings
-    }).rpc()
+    tokenMetadataProgramPromoOwner.program.methods
+      .transferCpi(1_000_000)
+      .accounts({
+        group,
+        platform: adminSettingsAccount.platform,
+        adminSettings,
+      })
+      .rpc();
   });
-
 
   it('Creates two promos', async () => {
     const metadataData1: DataV2 = {
@@ -188,7 +182,7 @@ describe('promo', () => {
 
       const memo = {
         reference: metadataData.symbol,
-        memo: "Created new promo"
+        memo: 'Created new promo',
       };
 
       mint = await tokenMetadataProgramPromoOwner.createPromo(
@@ -198,7 +192,7 @@ describe('promo', () => {
         maxMint,
         maxRedeem,
         adminSettingsAccount.platform,
-        JSON.stringify(memo)
+        JSON.stringify(memo),
       );
 
       promoExtended = await tokenMetadataProgram.getPromoExtended(mint);
@@ -222,7 +216,7 @@ describe('promo', () => {
   // of their membership in the group that owns the promo.
   it('Mints a promo token', async () => {
     const [tokenAccountAccount, mintAccount] = await tokenMetadataProgram
-      .mintPromoToken(mint, groupMember1, groupSeed, "just a string for a memo")
+      .mintPromoToken(mint, groupMember1, groupSeed, 'just a string for a memo')
       .then((tokenAccount) =>
         Promise.all([
           tokenMetadataProgram.getTokenAccount(tokenAccount),
@@ -243,9 +237,9 @@ describe('promo', () => {
   it('Delegates a promo token', async () => {
     // try different keys for memo
     const memo = {
-      source: "spirit",
-      platform: "shoes",
-      location: "here"
+      source: 'spirit',
+      platform: 'shoes',
+      location: 'here',
     };
 
     const tokenAccountAccount = await tokenMetadataProgram
@@ -261,16 +255,21 @@ describe('promo', () => {
         adminSettingsAccount.platform,
       );
 
-    console.log("mint", mint);
+    console.log('mint', mint);
     const memo = {
-      reference: "myReference",
-      memo: "burned delegated token"
+      reference: 'myReference',
+      memo: 'burned delegated token',
     };
 
-    const tokenAccount = await tokenMetadataProgramGroupMember1
-      .burnDelegatedPromoToken(mint, tokenOwner, platform.publicKey, groupSeed, JSON.stringify(memo))
+    const tokenAccount = await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
+      mint,
+      tokenOwner,
+      platform.publicKey,
+      groupSeed,
+      JSON.stringify(memo),
+    );
 
-    const mintAccount = await tokenMetadataProgram.getMintAccount(mint)
+    const mintAccount = await tokenMetadataProgram.getMintAccount(mint);
 
     // Fix indexer to delete account from db if it is closed.
     // await expect(tokenMetadataProgram.getTokenAccount(tokenAccount)).to.be.rejected
@@ -292,4 +291,9 @@ describe('promo', () => {
     }
   });
 
+  it('Signs a memo', async () => {
+    const memo = 'hello';
+    const tx = await tokenMetadataProgram.signMemo(memo);
+    console.log(tx);
+  });
 });

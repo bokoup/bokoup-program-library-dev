@@ -5,14 +5,15 @@ SET check_function_bodies = false;
 -- bpl_token_metadata
 -- =============================
 
-DROP TABLE IF EXISTS public.group CASCADE;
-DROP TABLE IF EXISTS public.promo_group CASCADE;
-DROP TABLE IF EXISTS public.promo CASCADE;
-DROP TABLE IF EXISTS public.create_promo_group CASCADE;
-DROP TABLE IF EXISTS public.create_promo CASCADE;
-DROP TABLE IF EXISTS public.mint_promo_token CASCADE;
-DROP TABLE IF EXISTS public.delegate_promo_token CASCADE;
 DROP TABLE IF EXISTS public.burn_delegated_promo_token CASCADE;
+DROP TABLE IF EXISTS public.create_promo CASCADE;
+DROP TABLE IF EXISTS public.create_promo_group CASCADE;
+DROP TABLE IF EXISTS public.delegate_promo_token CASCADE;
+DROP TABLE IF EXISTS public.group CASCADE;
+DROP TABLE IF EXISTS public.mint_promo_token CASCADE;
+DROP TABLE IF EXISTS public.promo CASCADE;
+DROP TABLE IF EXISTS public.promo_group CASCADE;
+DROP TABLE IF EXISTS public.sign_memo CASCADE;
 
 -- =============================
 -- mpl_auction_house

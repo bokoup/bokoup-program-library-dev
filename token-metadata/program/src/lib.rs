@@ -96,6 +96,18 @@ pub mod bpl_token_metadata {
         ctx.accounts.process(memo, authority_seeds)
     }
 
+    /// Signs a memo.
+    /// 
+    /// This could have just been done outside of the program, but doing it inside the program
+    /// makes it easier to get the resulting transaction filtered by our indexer based on 
+    /// program address.
+    pub fn sign_memo<'a, 'b, 'c, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, SignMemo<'info>>,
+        memo: String,
+    ) -> Result<()> {
+        ctx.accounts.process(memo)
+    }
+
     /// Creates a non-fungible token. Will be used in the future with additional promo token form
     /// factors and to facilitate grouping promo tokens in collections.
     pub fn create_non_fungible(
@@ -398,6 +410,15 @@ pub struct CreateMetaData<'info> {
     pub metadata_authority: UncheckedAccount<'info>,
     pub metadata_program: Program<'info, TokenMetadata>,
     pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts related to creation of token [Metadata].
+#[derive(Accounts, Clone)]
+pub struct SignMemo<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub memo_program: Program<'info, SplMemo>,
     pub system_program: Program<'info, System>,
 }
 

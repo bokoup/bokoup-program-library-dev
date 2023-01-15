@@ -3,7 +3,7 @@ use anchor_lang::AccountDeserialize;
 use bpl_api_data::{
     queries::bpl_token_metadata::{
         burn_delegated_promo_token, create_promo, create_promo_group, delegate_promo_token,
-        mint_promo_token, promo, promo_group,
+        mint_promo_token, promo, promo_group, sign_memo,
     },
     Client,
 };
@@ -68,6 +68,7 @@ impl Discriminator {
     pub const MINT_PROMO_TOKEN: [u8; 8] = [75, 139, 89, 205, 32, 105, 163, 161];
     pub const DELEGATE_PROMO_TOKEN: [u8; 8] = [85, 206, 226, 194, 207, 166, 164, 22];
     pub const BURN_DELEGATED_PROMO_TOKEN: [u8; 8] = [119, 36, 30, 56, 83, 96, 21, 132];
+    pub const SIGN_MEMO: [u8; 8] = [163, 48, 14, 17, 151, 234, 75, 51];
 }
 
 #[tracing::instrument(skip_all)]
@@ -121,6 +122,16 @@ pub async fn process_transaction<'a>(
         }
         Discriminator::BURN_DELEGATED_PROMO_TOKEN => {
             burn_delegated_promo_token::upsert(
+                &pg_client,
+                &message.signature,
+                &message.accounts,
+                &message.data,
+                message.slot,
+            )
+            .await
+        }
+        Discriminator::SIGN_MEMO => {
+            sign_memo::upsert(
                 &pg_client,
                 &message.signature,
                 &message.accounts,

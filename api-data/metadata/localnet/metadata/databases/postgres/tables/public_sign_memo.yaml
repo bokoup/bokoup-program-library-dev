@@ -1,0 +1,14 @@
+table:
+  name: sign_memo
+  schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - signature
+        - payer
+        - memo
+        - slot
+        - created_at
+        - modified_at
+      filter: {}
