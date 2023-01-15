@@ -8,4 +8,7 @@ gcloud beta run deploy $SERVICE_NAME --image us-west1-docker.pkg.dev/bokoup/demo
 --min-instances 1 \
 --update-env-vars RUST_LOG=DEBUG \
 --service-account demo-bokoup@bokoup.iam.gserviceaccount.com \
---update-secrets /keys/platform_signer/platform_signer-keypair.json=PLATFORM_SIGNER:1
+
+
+# --update-secrets /keys/platform_signer/platform_signer-keypair.json=PLATFORM_SIGNER_KEYPAIR:1
+# moved PLATFORM_SIGNER_KEYPAIR to environment variable
