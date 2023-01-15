@@ -293,7 +293,7 @@ describe('promo', () => {
 
   it('Signs a memo', async () => {
     const memo = 'hello';
-    const tx = await tokenMetadataProgram.signMemo(memo);
+    const tx = await tokenMetadataProgram.signMemo(memo, promoOwner);
     console.log(tx);
   });
 });

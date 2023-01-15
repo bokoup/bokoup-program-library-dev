@@ -14,20 +14,20 @@ pub async fn upsert(
     slot: u64,
 ) {
     let accounts: Vec<String> = accounts.iter().map(ToString::to_string).collect();
-    let memo = if let Ok(args) =
-        bpl_token_metadata::instruction::SignMemo::try_from_slice(&data[8..])
-    {
-        if let Ok(result) = serde_json::from_str::<serde_json::Value>(&args.memo) {
-            result
+    let memo =
+        if let Ok(args) = bpl_token_metadata::instruction::SignMemo::try_from_slice(&data[8..]) {
+            if let Ok(result) = serde_json::from_str::<serde_json::Value>(&args.memo) {
+                result
+            } else {
+                serde_json::json!({ "memo": args.memo.to_string()})
+            }
         } else {
-            serde_json::json!({ "memo": args.memo.to_string()})
-        }   
-    } else {
-        serde_json::Value::String("".to_string())
-    };
+            serde_json::Value::String("".to_string())
+        };
 
     let signature = signature.to_string();
     let payer = &accounts[0];
+    let signer = &accounts[1];
     let slot = slot as i64;
 
     let result = client
@@ -36,6 +36,7 @@ pub async fn upsert(
             &[
                 &signature,
                 payer,
+                signer,
                 &Json::<serde_json::Value>(memo),
                 &slot,
             ],

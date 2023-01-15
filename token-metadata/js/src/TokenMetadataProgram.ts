@@ -291,12 +291,14 @@ export class TokenMetadataProgram {
    *
    * @return      Signature
    */
-  async signMemo(memo: string): Promise<string> {
+  async signMemo(memo: string, signer: Keypair): Promise<string> {
     const tx = await this.program.methods
       .signMemo(memo)
       .accounts({
+        signer: signer.publicKey,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([signer])
       .rpc();
 
     return tx;

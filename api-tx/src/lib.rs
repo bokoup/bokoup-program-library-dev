@@ -124,6 +124,10 @@ pub fn create_app(
             "/promo/create/:payer/:group_seed/:memo",
             get(get_app_id::handler).post(get_create_promo_tx::handler),
         )
+        .route(
+            "/signmemo/:message/:memo",
+            get(get_app_id::handler).post(get_sign_memo_tx::handler),
+        )
         .layer(
             ServiceBuilder::new()
                 .layer(cors)
@@ -498,7 +502,8 @@ pub mod test {
         )
         .unwrap();
 
-        let mut tx = Transaction::new_with_payer(&[instruction], Some(&platform_signer_pubkey));
+        let mut tx =
+            Transaction::new_with_payer(&[instruction], Some(&state.platform_signer.pubkey()));
         let recent_blockhash = txd.message.recent_blockhash;
 
         tx.try_partial_sign(&[&state.platform_signer], recent_blockhash)
@@ -516,13 +521,12 @@ pub mod test {
     }
 
     #[tokio::test]
-    async fn test_get_burn_delegated_promo_tx() {
+    async fn test_sign_memo_tx() {
         dotenv::dotenv().ok();
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
 
-        let group_member =
-            parse_string_to_keypair(&std::env::var("GROUP_MEMBER_1_KEYPAIR").unwrap());
+        let signer = Keypair::new();
 
         let state = State::new(
             Cluster::Localnet,
@@ -538,26 +542,11 @@ pub mod test {
             Url::from_str(DATA_URL).unwrap(),
         );
 
-        let token_account = fetch_token_account(&state.data_url.to_string()).await;
-
-        let query = serde_json::json!({ "query": TOKEN_ACCOUNT_QUERY, "variables": {"id": token_account.to_string()}});
-        let result: serde_json::Value = state
-            .solana
-            .client
-            .post(&state.data_url.to_string())
-            .json(&query)
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        let (mint, token_owner, group) =
-            get_mint_owner_group_from_token_account_query(&group_member.pubkey(), &result).unwrap();
+        let pre_memo = r#"{"jingus": "amongus"}"#;
+        let memo = urlencoding::encode(pre_memo);
 
         let data = get_mint_promo_tx::Data {
-            account: group_member.pubkey().to_string(),
+            account: signer.pubkey().to_string(),
         };
 
         let message = urlencoding::encode(MESSAGE);
@@ -567,9 +556,9 @@ pub mod test {
                 Request::builder()
                     .method(Method::POST)
                     .uri(format!(
-                        "/promo/burn-delegated/{}/{}",
-                        token_account.to_string(),
+                        "/signmemo/{}/{}",
                         message.into_owned(),
+                        memo.to_string(),
                     ))
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_vec(&data).unwrap()))
@@ -588,20 +577,19 @@ pub mod test {
         )
         .unwrap();
 
-        let instruction = create_burn_delegated_promo_instruction(
-            group_member.pubkey(),
-            group,
-            token_owner,
-            mint,
-            state.platform,
-            None,
+        let instruction = create_sign_memo_instruction(
+            state.platform_signer.pubkey(),
+            pre_memo.to_string(),
+            signer.pubkey(),
         )
         .unwrap();
 
-        let mut tx = Transaction::new_with_payer(&[instruction], Some(&group_member.pubkey()));
+        let mut tx =
+            Transaction::new_with_payer(&[instruction], Some(&state.platform_signer.pubkey()));
         let recent_blockhash = txd.message.recent_blockhash;
-        tx.message.recent_blockhash = recent_blockhash;
 
+        tx.try_partial_sign(&[&state.platform_signer], recent_blockhash)
+            .unwrap();
         let serialized = bincode::serialize(&tx).unwrap();
         let transaction = base64::encode(serialized);
 

@@ -12,14 +12,14 @@ use bpl_token_metadata::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_accounts,
         CreatePromo as create_promo_accounts, CreatePromoGroup as create_promo_group_accounts,
         DelegatePromoToken as delegate_promo_token_accounts,
-        MintPromoToken as mint_promo_token_accounts,
+        MintPromoToken as mint_promo_token_accounts, SignMemo as sign_memo_accounts,
     },
     instruction::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_instruction,
         CreatePromo as create_promo_instruction,
         CreatePromoGroup as create_promo_group_instruction,
         DelegatePromoToken as delegate_promo_token_instruction,
-        MintPromoToken as mint_promo_token_instruction,
+        MintPromoToken as mint_promo_token_instruction, SignMemo as sign_memo_instruction,
     },
     state::{DataV2, Promo, PromoGroup},
     utils::{
@@ -257,6 +257,28 @@ pub fn create_burn_delegated_promo_instruction(
     .to_account_metas(Some(true));
 
     let data = burn_delegated_promo_token_instruction { memo }.data();
+
+    Ok(Instruction {
+        program_id: bpl_token_metadata::id(),
+        accounts,
+        data,
+    })
+}
+
+pub fn create_sign_memo_instruction(
+    payer: Pubkey,
+    memo: String,
+    signer: Pubkey,
+) -> Result<Instruction, AppError> {
+    let accounts = sign_memo_accounts {
+        payer,
+        signer,
+        memo_program: spl_memo::ID,
+        system_program: system_program::ID,
+    }
+    .to_account_metas(Some(true));
+
+    let data = sign_memo_instruction { memo }.data();
 
     Ok(Instruction {
         program_id: bpl_token_metadata::id(),

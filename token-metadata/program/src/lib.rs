@@ -97,9 +97,9 @@ pub mod bpl_token_metadata {
     }
 
     /// Signs a memo.
-    /// 
+    ///
     /// This could have just been done outside of the program, but doing it inside the program
-    /// makes it easier to get the resulting transaction filtered by our indexer based on 
+    /// makes it easier to get the resulting transaction filtered by our indexer based on
     /// program address.
     pub fn sign_memo<'a, 'b, 'c, 'info>(
         ctx: Context<'a, 'b, 'c, 'info, SignMemo<'info>>,
@@ -418,6 +418,7 @@ pub struct CreateMetaData<'info> {
 pub struct SignMemo<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    pub signer: Signer<'info>,
     pub memo_program: Program<'info, SplMemo>,
     pub system_program: Program<'info, System>,
 }
