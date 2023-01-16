@@ -1,18 +1,11 @@
-use crate::{error::AppError, handlers::Params};
-use axum::{extract::Path, Json};
+use crate::error::AppError;
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
 pub const LABEL: &str = "bokoup";
 pub const ICON: &str = "https://arweave.net/wrKmRzr2KhH92c1iyFeUqkB-AHjYlE7Md7U5rK4qA8M";
 
-pub async fn handler(
-    Path(Params {
-        mint_string,
-        message,
-        memo,
-    }): Path<Params>,
-) -> Result<Json<ResponseData>, AppError> {
-    tracing::debug!(mint_string = mint_string, message = message, memo = memo);
+pub async fn handler() -> Result<Json<ResponseData>, AppError> {
     Ok(Json(ResponseData {
         label: LABEL.to_string(),
         icon: ICON.to_string(),

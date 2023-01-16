@@ -1,6 +1,7 @@
 use anchor_lang::prelude::Pubkey;
 use bpl_api_tx::{create_app, parse_string_to_keypair, utils::solana::Cluster};
 use clap::Parser;
+use solana_sdk::signer::Signer;
 use std::{net::SocketAddr, str::FromStr};
 use tracing_subscriber::prelude::*;
 use url::Url;
@@ -33,6 +34,7 @@ async fn main() {
     let args = Args::parse();
 
     let platform_signer = parse_string_to_keypair(&args.platform_signer);
+    tracing::debug!(platform_signer = platform_signer.pubkey().to_string());
 
     let data_url: Url = Url::from_str(match args.cluster {
         Cluster::Devnet => "https://data.api.bokoup.dev/v1/graphql/",

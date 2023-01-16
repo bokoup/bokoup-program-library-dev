@@ -1,4 +1,3 @@
-use ed25519_dalek::PublicKey;
 use serde::{Deserialize, Serialize};
 
 pub mod get_app_id;

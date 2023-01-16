@@ -2,7 +2,7 @@ use anchor_lang::solana_program::pubkey::ParsePubkeyError;
 use serde_json::json;
 use solana_sdk::signature::SignerError;
 use thiserror::Error;
-
+// ed25519_dalek::ed25519::Error
 use axum::{
     body::BoxBody,
     http::{Response, StatusCode},
@@ -23,6 +23,8 @@ pub enum AppError {
     CreatePromoRequestError(String),
     #[error("data query error")]
     DataQueryError,
+    #[error("keypair error")]
+    KeyPairError(#[from] ed25519_dalek::ed25519::Error),
     #[error("pubkey error")]
     PubkeyError(#[from] ParsePubkeyError),
     #[error("payer not in members")]
