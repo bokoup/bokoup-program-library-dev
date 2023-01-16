@@ -34,11 +34,12 @@ The cli is setup to use the localnet db as the default.
 
 1. apply migrations
    ```
+   cd api-data
    cargo run -- --db-url devnet apply-migrations
    ```
 2. change working directory to devnet
    ```
-   cd devnet
+   cd metadata/devnet
    ```
 3. change endpoint in `devnet/config.yaml` to localnet endpoint:
    `https://shining-sailfish-15.hasura.app`

@@ -19,22 +19,32 @@ Need to install build-essentials pkg-config libssl-dev
 
 ### update
 
-1. Pull `bokoup-program-library` and `geyser-plugin-nats` repos
-2. `cargo-build --release` in each
-3. `sudo cp /home/ubuntu/bokoup-program-library/target/release/libbpl_indexer.so /usr/local/bin`
-4. `sudo cp /home/ubuntu/geyser-plugin-nats/target/release/libgeyser_plugin_nats.so /home/sol`
+1. Pull `bokoup-program-library` and `geyser-plugin-nats` repos - make sure remote url is set to the right upstream repo; git@github.com:bokoup/bokoup-program-library-def.git
+1. `cargo-build --release` in each
+1. `sudo systemctl stop bpl-indexer`
+1. `sudo systemctl stop sol`
+1. `sudo cp /home/ubuntu/bokoup-program-library/target/release/bpl-indexer /usr/local/bin`
+1. `sudo cp /home/ubuntu/geyser-plugin-nats/target/release/libgeyser_plugin_nats.so /home/sol`
+
+1. `sudo systemctl start bpl-indexer`1
 
 If there were changes to config.json 5.
 `cp /home/ubuntu/geyser-plugin-nats/config.json /home/sol` 6. Update `config.json` to point to the
 correct location for `libgeyser_plugin_nats.so`
 
-Restart services 7. Indexer
+Reload systemctl daemon
+
+1. `sudo systemctl daemon-reload`
+
+Restart services
+
+1. Indexer
 
 ```
-sudo systemctl restart bpl-indexer
+sudo systemctl start bpl-indexer
 ```
 
-7. Validator
+1. Validator
 
 ```
 sudo systemctl restart sol
