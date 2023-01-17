@@ -9,11 +9,21 @@ use anchor_client::{
 };
 use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, PromoGroup}, utils::{self, find_group_address}};
 use bundlr_sdk::{tags::Tag, Bundlr, Ed25519Signer};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ArgEnum};
 use ed25519_dalek::Keypair as DalekKeypair;
 use tokio::time::sleep;
 use std::{path::PathBuf, rc::Rc, time::Duration};
 use tracing_subscriber::prelude::*;
+
+#[derive(ArgEnum, Clone, Debug)]
+enum Address {
+    ProgramAuthority,
+    Platform,
+    PlatformSigner,
+    PromoOwner,
+    Group,
+    GroupMember,
+}
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -34,6 +44,7 @@ struct Cli {
     #[clap(long, default_value = "../../target/deploy/group_member_1-keypair.json", value_parser = valid_file_path)]
     group_member_path: PathBuf,
     #[clap(long, default_value = "../../target/deploy/group_seed-keypair.json", value_parser = valid_file_path)]
+
     group_seed_path: PathBuf,
     #[clap(long, default_value_t = Cluster::Localnet, value_parser)]
     cluster: Cluster,
@@ -60,6 +71,10 @@ enum Commands {
     },
     #[clap(about = "Tesing requesting data from graphql api")]
     TestGql,
+    Balance {
+        #[clap(arg_enum, default_value = "group")]
+        address: Address
+    }
 }
 
 #[tokio::main]
@@ -104,11 +119,13 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let program = client.program(bpl_token_metadata::id());
+            let (group, _) = find_group_address(&group_seed_keypair.pubkey());
 
             for pubkey in [
                 &program_authority,
                 &platform_signer_keypair.pubkey(),
                 &promo_owner_keypair.pubkey(),
+                &group
             ] {
                 program
                 .rpc()
@@ -118,6 +135,46 @@ async fn main() -> anyhow::Result<()> {
             };
             
 
+            Ok(())
+        }
+        Commands::Balance { address } => {
+            let program_authority = program_authority_keypair.pubkey();
+            let rc_payer_keypair = Rc::new(program_authority_keypair);
+            let client = Client::new_with_options(
+                cli.cluster,
+                rc_payer_keypair,
+                CommitmentConfig::confirmed(),
+            );
+
+            let program = client.program(bpl_token_metadata::id());
+            
+            let pubkey = match address {
+                Address::ProgramAuthority => {
+                    program_authority
+                }
+                Address::Platform => {
+                    platform_keypair.pubkey()
+                }
+                Address::PlatformSigner => {
+                    platform_signer_keypair.pubkey()
+                }
+                Address::PromoOwner => {
+                    promo_owner_keypair.pubkey()
+                }
+                Address::Group => {
+                    let (address, _) = find_group_address(&group_seed_keypair.pubkey());
+                    address
+                }
+                Address::GroupMember => {
+                    group_member_keypair.pubkey()
+                }
+            };
+            let balance = program
+                .rpc()
+                .get_balance(&pubkey)
+                .unwrap();
+
+            println!("{:?}: {{address: {pubkey}, balance: {balance}}}", address);
             Ok(())
         }
         Commands::CreateAdminSettings {
