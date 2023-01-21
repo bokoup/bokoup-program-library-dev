@@ -1,9 +1,8 @@
 import * as anchor from '@project-serum/anchor';
-import { TokenMetadataProgram, AdminSettings, DataV2, PromoExtended, PromoGroup } from '../src';
+import { TokenMetadataProgram, AdminSettings, DataV2, PromoExtended, PromoGroup, AuctionHouseProgram } from '../src';
 import { PublicKey, Keypair, Transaction, Connection } from '@solana/web3.js';
 import chai = require('chai');
 import chaiAsPromised = require('chai-as-promised');
-const fs = require('fs');
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 import * as dotenv from 'dotenv';
@@ -37,6 +36,13 @@ describe('promo', () => {
 
   const tokenMetadataProgramPromoOwner = new TokenMetadataProgram(promoOwnerProvider);
 
+  const plaformSigner = Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
+  );
+  const platformSignerWallet = new anchor.Wallet(plaformSigner);
+  const platformSignerProvider = new anchor.AnchorProvider(connection, platformSignerWallet, options);
+  let auctionHouseProgram: AuctionHouseProgram;
+
   const platform = Keypair.fromSecretKey(new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)));
   console.log('promoOwner: ', promoOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
@@ -54,10 +60,8 @@ describe('promo', () => {
   const groupMember1 = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.GROUP_MEMBER_1_KEYPAIR)),
   );
-  console.log('groupMember1', groupMember1.publicKey.toString());
-  const plaformSigner = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
-  );
+  
+  
 
   const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(
     new anchor.AnchorProvider(connection, new anchor.Wallet(groupMember1), options),
@@ -93,7 +97,7 @@ describe('promo', () => {
   });
 
   it('creates admin settings', async () => {
-    [adminSettings] = await tokenMetadataProgram.findAdminAddress();
+    adminSettings = await tokenMetadataProgram.findAdminAddress();
 
     await tokenMetadataProgram.createAdminSettings(platform, 10_000_000, 1_000_000);
 
@@ -111,7 +115,7 @@ describe('promo', () => {
     const lamports = 500_000_000;
     const memo = 'Created a new group for bokoup store group';
 
-    [group] = await tokenMetadataProgramPromoOwner.createPromoGroup(
+    group = await tokenMetadataProgramPromoOwner.createPromoGroup(
       groupSeed,
       members,
       lamports,
@@ -261,7 +265,7 @@ describe('promo', () => {
       memo: 'burned delegated token',
     };
 
-    const tokenAccount = await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
+    await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
       mint,
       tokenOwner,
       platform.publicKey,
@@ -271,7 +275,7 @@ describe('promo', () => {
 
     const mintAccount = await tokenMetadataProgram.getMintAccount(mint);
 
-    // Fix indexer to delete account from db if it is closed.
+    // TODO: Fix indexer to delete account from db if it is closed.
     // await expect(tokenMetadataProgram.getTokenAccount(tokenAccount)).to.be.rejected
 
     promoExtended = await tokenMetadataProgram.getPromoExtended(mint);
@@ -296,4 +300,11 @@ describe('promo', () => {
     const tx = await tokenMetadataProgram.signMemo(memo, promoOwner);
     console.log(tx);
   });
+
+  it('Creates an auction house', async () => {
+    auctionHouseProgram = await AuctionHouseProgram.fetchProgram(platformSignerProvider);
+    const tx = auctionHouseProgram.createAuctionHouse();
+    console.log(tx);
+  });
+
 });
