@@ -23,6 +23,7 @@ enum Address {
     PromoOwner,
     Group,
     GroupMember,
+    GroupSeed,
 }
 
 #[derive(Parser)]
@@ -133,8 +134,6 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap();
                 sleep(Duration::from_secs(1)).await;
             };
-            
-
             Ok(())
         }
         Commands::Balance { address } => {
@@ -167,6 +166,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Address::GroupMember => {
                     group_member_keypair.pubkey()
+                }
+                Address::GroupSeed => {
+                    group_seed_keypair.pubkey()
                 }
             };
             let balance = program
