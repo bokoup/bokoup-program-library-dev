@@ -86,6 +86,7 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
     let mut buf = message.account.data.as_ref();
     let slot = message.slot;
     let write_version = message.account.write_version;
+    tracing::error!("buf_len: {}", buf.len());
 
     match buf.len() {
         AUCTION_HOUSE_SIZE => {

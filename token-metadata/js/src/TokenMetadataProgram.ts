@@ -35,7 +35,6 @@ export class TokenMetadataProgram {
   readonly AUTHORITY_PREFIX: string;
   readonly METADATA_PREFIX: string;
   readonly PROMO_PREFIX: string;
-  
 
   program: Program;
   payer: Wallet;
@@ -53,7 +52,6 @@ export class TokenMetadataProgram {
     this.AUTHORITY_PREFIX = 'authority';
     this.METADATA_PREFIX = 'metadata';
     this.PROMO_PREFIX = 'promo';
-    
 
     this.program = new Program(idl as Idl, this.PUBKEY, provider);
     const anchorProvider = this.program.provider as AnchorProvider;
@@ -304,8 +302,8 @@ export class TokenMetadataProgram {
       .rpc();
 
     return tx;
-  }  
-  
+  }
+
   async getTokenAccount(address: PublicKey): Promise<TokenAccount> {
     return await getTokenAccount(this.program.provider.connection, address);
   }
@@ -381,10 +379,7 @@ export class TokenMetadataProgram {
     );
   }
 
-  findAssociatedTokenAccountAddress(
-    mint: PublicKey,
-    wallet: PublicKey,
-  ): PublicKey {
+  findAssociatedTokenAccountAddress(mint: PublicKey, wallet: PublicKey): PublicKey {
     return PublicKey.findProgramAddressSync(
       [wallet.toBuffer(), this.TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
       this.SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
@@ -427,10 +422,7 @@ export class TokenMetadataProgram {
       new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
     )[0];
   }
-
 }
-
-
 
 export class PromoExtendedImpl implements PromoExtended {
   owner: PublicKey;
@@ -466,4 +458,3 @@ export class PromoExtendedImpl implements PromoExtended {
     this.maxBurn = promoAccount.maxBurn;
   }
 }
-

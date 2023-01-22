@@ -1,3 +1,17 @@
 table:
   name: listing_with_token
   schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - created_at_on_chain
+        - price
+        - slot
+        - token_size
+        - id
+        - metadata
+        - mint
+        - seller
+        - token_account
+      filter: {}

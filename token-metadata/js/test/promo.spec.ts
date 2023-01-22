@@ -1,5 +1,14 @@
 import * as anchor from '@project-serum/anchor';
-import { TokenMetadataProgram, AdminSettings, DataV2, PromoExtended, PromoGroup, AuctionHouseProgram } from '../src';
+import { ListingReceipt } from '@metaplex-foundation/mpl-auction-house';
+import { getAccount } from '@solana/spl-token';
+import {
+  TokenMetadataProgram,
+  AdminSettings,
+  DataV2,
+  PromoExtended,
+  PromoGroup,
+  AuctionHouseProgram,
+} from '../src';
 import { PublicKey, Keypair, Transaction, Connection } from '@solana/web3.js';
 import chai = require('chai');
 import chaiAsPromised = require('chai-as-promised');
@@ -36,16 +45,17 @@ describe('promo', () => {
 
   const tokenMetadataProgramPromoOwner = new TokenMetadataProgram(promoOwnerProvider);
 
-  const plaformSigner = Keypair.fromSecretKey(
+  const platformSigner = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
   );
-  const platformSignerWallet = new anchor.Wallet(plaformSigner);
-  const platformSignerProvider = new anchor.AnchorProvider(connection, platformSignerWallet, options);
-  let auctionHouseProgram: AuctionHouseProgram;
+
+  const auctionHouseProgram = new AuctionHouseProgram(connection);
+  let auctionHouse: PublicKey;
 
   const platform = Keypair.fromSecretKey(new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)));
   console.log('promoOwner: ', promoOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
+  console.log('platformSigner: ', platformSigner.publicKey.toString());
 
   let adminSettings: PublicKey;
   let adminSettingsAccount: AdminSettings;
@@ -60,8 +70,6 @@ describe('promo', () => {
   const groupMember1 = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.GROUP_MEMBER_1_KEYPAIR)),
   );
-  
-  
 
   const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(
     new anchor.AnchorProvider(connection, new anchor.Wallet(groupMember1), options),
@@ -76,7 +84,7 @@ describe('promo', () => {
       platform.publicKey,
       promoOwner.publicKey,
       groupMember1.publicKey,
-      plaformSigner.publicKey,
+      platformSigner.publicKey,
     ];
     addresses.forEach((address) => {
       transaction.add(
@@ -111,7 +119,7 @@ describe('promo', () => {
   });
 
   it('creates group', async () => {
-    const members = [promoOwner.publicKey, groupMember1.publicKey, plaformSigner.publicKey];
+    const members = [promoOwner.publicKey, groupMember1.publicKey, platformSigner.publicKey];
     const lamports = 500_000_000;
     const memo = 'Created a new group for bokoup store group';
 
@@ -302,9 +310,91 @@ describe('promo', () => {
   });
 
   it('Creates an auction house', async () => {
-    auctionHouseProgram = await AuctionHouseProgram.fetchProgram(platformSignerProvider);
-    const tx = auctionHouseProgram.createAuctionHouse();
-    console.log(tx);
+    ({ auctionHouse } = await auctionHouseProgram.createAuctionHouse(platformSigner));
+    console.log('ah_createAuctionHouse: ', auctionHouse.toString());
   });
 
+  // it('creates pdsa correctly', async () => {
+  //   const ata = auctionHouseProgram.findAssociatedTokenAccountAddress(mint, tokenOwner);
+  //   const [ataOld] = await AHPOld.findAssociatedTokenAccountAddress(mint, tokenOwner);
+  //   expect(ata.toString()).to.equal(ataOld.toString(), 'associated token account not equal');
+
+  //   const ah = auctionHouseProgram.findAuctionHouseAddress(platformSigner.publicKey, NATIVE_MINT);
+  //   const aHaOld = await AHPOld.findAuctionHouseAddress(platformSigner.publicKey, NATIVE_MINT);
+  //   expect(ah.toString()).to.equal(aHaOld.toString(), 'auction house account not equal');
+
+  //   const ahF = auctionHouseProgram.findAuctionHouseFeeAddress(ah[0]);
+  //   const aHFOld = await AHPOld.findAuctionHouseFeeAddress(ah[0]);
+  //   expect(ahF.toString()).to.equal(aHFOld.toString(), 'auction house fee address');
+
+  //   const ahps = auctionHouseProgram.findAuctionHouseProgramAsSignerAddress();
+  //   const ahpsOld = await AHPOld.findAuctionHouseProgramAsSignerAddress();
+  //   expect(ahps.toString()).to.equal(ahpsOld.toString(), 'program as signer');
+
+  //   const salePrice = 1_000_000;
+  //   const tokenSize = 1;
+
+  //   const sellerTradeState = auctionHouseProgram.findTradeStateAddress(
+  //     tokenOwner,
+  //     auctionHouse,
+  //     ata,
+  //     NATIVE_MINT,
+  //     mint,
+  //     salePrice,
+  //     tokenSize,
+  //   );
+  //   const sellerTradeStateOld = await AHPOld.findTradeStateAddress(
+  //     tokenOwner,
+  //     auctionHouse,
+  //     ata,
+  //     NATIVE_MINT,
+  //     mint,
+  //     salePrice,
+  //     tokenSize,
+  //   );
+  //   expect(sellerTradeState.toString()).to.equal(
+  //     sellerTradeStateOld.toString(),
+  //     'seller trade state',
+  //   );
+  // });
+
+  it('creates a sell offer', async () => {
+    // payer is the seller in this case
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    await tokenMetadataProgram
+      .mintPromoToken(mint, groupMember1, groupSeed, 'just a string for a memo')
+      .then((tokenAccount) =>
+        Promise.all([
+          tokenMetadataProgram.getTokenAccount(tokenAccount),
+          tokenMetadataProgram.getMintAccount(promoExtended.mintAccount.address),
+        ]),
+      );
+
+    console.log(
+      'creates a sell offer',
+      tokenMetadataProgram.payer.payer.publicKey.toString(),
+      auctionHouse.toString(),
+    );
+
+    const { listingReceipt, tokenAccount } = await auctionHouseProgram.createSellOffer(
+      tokenMetadataProgram.payer.payer,
+      auctionHouse,
+      platformSigner.publicKey,
+      promoExtended.mint,
+      promoExtended.metadata,
+      salePrice,
+      tokenSize,
+    );
+
+    const accountInfo = await connection.getAccountInfo(listingReceipt);
+    expect(accountInfo, 'listingReceipt accountInfo not found');
+    const listingReceiptAccount = ListingReceipt.fromAccountInfo(accountInfo!);
+
+    console.log('ah_listing_receipt: ', listingReceiptAccount);
+
+    const tokenAccountData = await getAccount(connection, tokenAccount);
+    console.log('ah_token_account: ', tokenAccountData);
+  });
 });

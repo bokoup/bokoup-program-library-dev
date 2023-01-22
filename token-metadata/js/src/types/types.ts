@@ -1,13 +1,8 @@
 import { BN } from '@project-serum/anchor';
 import { PublicKey } from '@solana/web3.js';
 
-import {
-  Metadata,
-} from '@metaplex-foundation/mpl-token-metadata';
-import {
-
-  Mint,
-} from '@solana/spl-token';
+import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
+import { Mint } from '@solana/spl-token';
 
 export type Network =
   | 'http://127.0.0.1:8899'
@@ -23,7 +18,7 @@ export type AdminSettings = {
 
 export type PromoGroup = {
   owner: PublicKey;
-  seed: PublicKey,
+  seed: PublicKey;
   nonce: number;
   members: Array<PublicKey>;
 };
@@ -34,7 +29,7 @@ export type UI<T> = T & {
 
 export type Promo = {
   owner: PublicKey;
-  mint: PublicKey,
+  mint: PublicKey;
   metadata: PublicKey;
   mintCount: number;
   burnCount: number;

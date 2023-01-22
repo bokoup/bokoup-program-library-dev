@@ -1,3 +1,22 @@
 table:
   name: purchase_receipt
   schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - created_at_on_chain
+        - price
+        - slot
+        - token_size
+        - write_version
+        - bump
+        - auction_house
+        - bookkeeper
+        - buyer
+        - id
+        - metadata
+        - seller
+        - created_at
+        - modified_at
+      filter: {}
