@@ -20,6 +20,18 @@ import {
   PrintListingReceiptInstructionArgs,
   PrintListingReceiptInstructionAccounts,
   createPrintListingReceiptInstruction,
+  DepositInstructionArgs,
+  DepositInstructionAccounts,
+  createDepositInstruction,
+  createBuyInstruction,
+  BuyInstructionArgs,
+  BuyInstructionAccounts,
+  createPublicBuyInstruction,
+  PublicBuyInstructionArgs,
+  PublicBuyInstructionAccounts,
+  PrintBidReceiptInstructionArgs,
+  PrintBidReceiptInstructionAccounts,
+  createPrintBidReceiptInstruction,
 } from '@metaplex-foundation/mpl-auction-house';
 
 import { NATIVE_MINT } from '@solana/spl-token';
@@ -213,6 +225,131 @@ export class AuctionHouseProgram {
     return { tx, listingReceipt, tokenAccount };
   }
 
+  /**
+   * Creates buy offer and bid receipt
+   *
+   * @param buyer        Buyer
+   * @param seller       Seller
+   * @param auctionHouse Auction house
+   * @param authority    Auction house authority
+   * @param mint         Semi-fungible mint
+   * @param metadata     Semi-fungible metadata
+   * @param salePrice    Sale price for tokenSize tokens
+   * @param tokenSize    Number of tokens to offer for sale
+   * @param publicBuy    true for public, false for private
+   *
+   * @return Address of bid receipt, address of escrow payment account
+   */
+  async createBuyOffer(
+    buyer: Keypair,
+    seller: PublicKey,
+    auctionHouse: PublicKey,
+    authority: PublicKey,
+    mint: PublicKey,
+    metadata: PublicKey,
+    salePrice: number,
+    tokenSize: number,
+    publicBuy = false,
+  ): Promise<{ tx: string; bidReceipt: PublicKey; escrowPaymentAccount: PublicKey }> {
+    const tokenAccount = this.findAssociatedTokenAccountAddress(mint, seller);
+    const [auctionHouseFeeAccount] = this.findAuctionHouseFeeAddress(auctionHouse);
+
+    const [buyerTradeState, tradeStateBump] = publicBuy
+      ? this.findPublicBidTradeStateAddress(
+          buyer.publicKey,
+          auctionHouse,
+          NATIVE_MINT,
+          mint,
+          salePrice,
+          tokenSize,
+        )
+      : this.findTradeStateAddress(
+          buyer.publicKey,
+          auctionHouse,
+          tokenAccount,
+          NATIVE_MINT,
+          mint,
+          salePrice,
+          tokenSize,
+        );
+
+    const [escrowPaymentAccount, escrowPaymentBump] = this.findEscrowPaymentAccountAddress(
+      auctionHouse,
+      buyer.publicKey,
+    );
+
+    const [bidReceipt, receiptBump] = this.findBidReceiptAddress(buyerTradeState);
+
+    const accounts: BuyInstructionAccounts = {
+      wallet: buyer.publicKey,
+      paymentAccount: buyer.publicKey,
+      transferAuthority: buyer.publicKey,
+      treasuryMint: NATIVE_MINT,
+      tokenAccount,
+      metadata,
+      escrowPaymentAccount,
+      authority,
+      auctionHouse,
+      auctionHouseFeeAccount,
+      buyerTradeState,
+    };
+
+    const args: BuyInstructionArgs = {
+      tradeStateBump,
+      escrowPaymentBump,
+      buyerPrice: salePrice,
+      tokenSize,
+    };
+
+    const depositAccounts: DepositInstructionAccounts = {
+      wallet: buyer.publicKey,
+      paymentAccount: buyer.publicKey,
+      transferAuthority: buyer.publicKey,
+      escrowPaymentAccount,
+      treasuryMint: NATIVE_MINT,
+      authority,
+      auctionHouse,
+      auctionHouseFeeAccount,
+    };
+
+    const depositArgs: DepositInstructionArgs = {
+      escrowPaymentBump,
+      amount: salePrice,
+    };
+
+    const transaction = new Transaction({ feePayer: buyer.publicKey } as TransactionBlockhashCtor);
+    transaction.add(createDepositInstruction(depositAccounts, depositArgs));
+    if (publicBuy) {
+      transaction.add(createPublicBuyInstruction(accounts, args));
+    } else {
+      transaction.add(createBuyInstruction(accounts, args));
+    }
+
+    const bidReceiptAccounts: PrintBidReceiptInstructionAccounts = {
+      receipt: bidReceipt,
+      bookkeeper: buyer.publicKey,
+      instruction: SYSVAR_INSTRUCTIONS_PUBKEY,
+    };
+
+    const bidReceiptArgs: PrintBidReceiptInstructionArgs = {
+      receiptBump,
+    };
+
+    transaction.add(createPrintBidReceiptInstruction(bidReceiptAccounts, bidReceiptArgs));
+
+    const latestBlockhash = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.sign(buyer);
+    const tx = await this.connection.sendRawTransaction(transaction.serialize());
+    await this.connection.confirmTransaction({
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      signature: tx,
+    });
+
+    return { tx, bidReceipt, escrowPaymentAccount };
+  }
+
   findAuctionHouseAddress(creator: PublicKey, treasuryMint: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(this.PREFIX), creator.toBuffer(), treasuryMint.toBuffer()],
@@ -268,6 +405,35 @@ export class AuctionHouseProgram {
         new BN(buyPrice).toArrayLike(Buffer, 'le', 8),
         new BN(tokenSize).toArrayLike(Buffer, 'le', 8),
       ],
+      this.AUCTION_HOUSE_PROGRAM_ID,
+    );
+  }
+
+  findPublicBidTradeStateAddress(
+    wallet: PublicKey,
+    auctionHouse: PublicKey,
+    treasuryMint: PublicKey,
+    tokenMint: PublicKey,
+    buyPrice: number,
+    tokenSize: number,
+  ): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(this.PREFIX),
+        wallet.toBuffer(),
+        auctionHouse.toBuffer(),
+        treasuryMint.toBuffer(),
+        tokenMint.toBuffer(),
+        new BN(buyPrice).toArrayLike(Buffer, 'le', 8),
+        new BN(tokenSize).toArrayLike(Buffer, 'le', 8),
+      ],
+      this.AUCTION_HOUSE_PROGRAM_ID,
+    );
+  }
+
+  findEscrowPaymentAccountAddress(auctionHouse: PublicKey, wallet: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.PREFIX), auctionHouse.toBuffer(), wallet.toBuffer()],
       this.AUCTION_HOUSE_PROGRAM_ID,
     );
   }

@@ -1,5 +1,5 @@
 import * as anchor from '@project-serum/anchor';
-import { ListingReceipt } from '@metaplex-foundation/mpl-auction-house';
+import { ListingReceipt, BidReceipt, AuctionHouse } from '@metaplex-foundation/mpl-auction-house';
 import { getAccount } from '@solana/spl-token';
 import {
   TokenMetadataProgram,
@@ -48,6 +48,8 @@ describe('promo', () => {
   const platformSigner = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
   );
+
+  const buyer = Keypair.generate();
 
   const auctionHouseProgram = new AuctionHouseProgram(connection);
   let auctionHouse: PublicKey;
@@ -388,13 +390,49 @@ describe('promo', () => {
       tokenSize,
     );
 
-    const accountInfo = await connection.getAccountInfo(listingReceipt);
-    expect(accountInfo, 'listingReceipt accountInfo not found');
-    const listingReceiptAccount = ListingReceipt.fromAccountInfo(accountInfo!);
+    const listingReceiptAccount = await ListingReceipt.fromAccountAddress(
+      connection,
+      listingReceipt,
+    );
 
     console.log('ah_listing_receipt: ', listingReceiptAccount);
 
     const tokenAccountData = await getAccount(connection, tokenAccount);
     console.log('ah_token_account: ', tokenAccountData);
+  });
+
+  it('creates a buy offer', async () => {
+    // payer is the seller in this case
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    const tx = await connection.requestAirdrop(buyer.publicKey, 1_000_000_000);
+    await connection.confirmTransaction({
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      signature: tx,
+    });
+
+    const { bidReceipt, escrowPaymentAccount } = await auctionHouseProgram.createBuyOffer(
+      buyer,
+      tokenOwner,
+      auctionHouse,
+      platformSigner.publicKey,
+      promoExtended.mint,
+      promoExtended.metadata,
+      salePrice,
+      tokenSize,
+      true,
+    );
+
+    const bidReceiptAccount = await BidReceipt.fromAccountAddress(connection, bidReceipt);
+    console.log('ah_bidReceipt: ', bidReceiptAccount);
+
+    const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
+    expect(escrowAccountInfo!.lamports).to.equal(
+      salePrice + 890880,
+      'escrowAccount lamports incorrect.',
+    );
   });
 });
