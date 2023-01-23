@@ -26,10 +26,13 @@
         "eslint": "^8.3.0",
         "eslint-config-prettier": "^8.3.0",
         "eslint-plugin-prettier": "^4.0.0",
-        "lerna": "^4.0.0",
+        "lerna": "^6.4.1",
         "prettier": "^2.4.1"
     },
     "resolutions": {
         "**/@solana/spl-token": "0.2.0"
+    },
+    "dependencies": {
+        "@metaplex-foundation/mpl-auction-house": "^2.3.2"
     }
 }

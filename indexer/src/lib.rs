@@ -48,6 +48,7 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: MessageD
             if message.account.owner == programs::bpl_token_metadata::ID.as_ref() {
                 programs::bpl_token_metadata::process(pg_client, message).await
             } else if message.account.owner == programs::mpl_auction_house::ID.as_ref() {
+                let buf_len = &message.account.data.as_ref().len();
                 programs::mpl_auction_house::process(pg_client, message).await
             } else if message.account.owner == programs::mpl_token_metadata::ID.as_ref() {
                 programs::mpl_token_metadata::process(pg_client, message).await

@@ -27,3 +27,5 @@ startup_wait = 20000
 url = "https://api.devnet.solana.com"
 [[test.validator.clone]]
 address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+[[test.validator.clone]]
+address = "hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk"

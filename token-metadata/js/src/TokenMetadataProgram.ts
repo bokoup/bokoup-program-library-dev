@@ -74,8 +74,8 @@ export class TokenMetadataProgram {
     createPromoLamports: number,
     burnPromoTokenLamports: number,
   ): Promise<PublicKey> {
-    const [adminSettings] = await this.findAdminAddress();
-    const [programData] = await this.findProgramDataAdress();
+    const adminSettings = this.findAdminAddress();
+    const programData = this.findProgramDataAdress();
 
     await this.program.methods
       .createAdminSettings({
@@ -98,13 +98,13 @@ export class TokenMetadataProgram {
     members: Array<PublicKey>,
     lamports: number,
     memo: string | null,
-  ): Promise<[PublicKey, number]> {
-    const [group, nonce] = await this.findPromoGroupAddress(seed);
+  ): Promise<PublicKey> {
+    const group = this.findPromoGroupAddress(seed);
 
     const groupData: PromoGroup = {
       owner: this.payer.publicKey,
       seed,
-      nonce,
+      nonce: 0,
       members,
     };
 
@@ -117,7 +117,7 @@ export class TokenMetadataProgram {
       })
       .rpc();
     console.log('jingus', group);
-    return [group, nonce];
+    return group;
   }
 
   /**
@@ -126,7 +126,7 @@ export class TokenMetadataProgram {
    * @return Address of the platform account
    */
   async fetchPlatformAddress(): Promise<PublicKey> {
-    const [adminSettings] = await this.findAdminAddress();
+    const adminSettings = this.findAdminAddress();
     const adminSettingsAccount = (await this.program.account.adminSettings.fetch(
       adminSettings,
     )) as AdminSettings;
@@ -156,8 +156,8 @@ export class TokenMetadataProgram {
   ): Promise<PublicKey> {
     const mint = Keypair.generate();
 
-    const [metadata] = await this.findMetadataAddress(mint.publicKey);
-    const [group] = await this.findPromoGroupAddress(groupSeed);
+    const metadata = this.findMetadataAddress(mint.publicKey);
+    const group = this.findPromoGroupAddress(groupSeed);
 
     const promoData: Promo = {
       owner: group,
@@ -201,8 +201,8 @@ export class TokenMetadataProgram {
     groupSeed: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
-    const [tokenAccount] = await this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
-    const [group] = await this.findPromoGroupAddress(groupSeed);
+    const tokenAccount = this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
+    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .mintPromoToken(memo)
@@ -233,8 +233,8 @@ export class TokenMetadataProgram {
     groupSeed: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
-    const [tokenAccount] = await this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
-    const [group] = await this.findPromoGroupAddress(groupSeed);
+    const tokenAccount = this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
+    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .delegatePromoToken(memo)
@@ -267,8 +267,8 @@ export class TokenMetadataProgram {
     groupSeed: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
-    const [tokenAccount] = await this.findAssociatedTokenAccountAddress(mint, tokenOwner);
-    const [group] = await this.findPromoGroupAddress(groupSeed);
+    const tokenAccount = this.findAssociatedTokenAccountAddress(mint, tokenOwner);
+    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .burnDelegatedPromoToken(memo)
@@ -317,8 +317,8 @@ export class TokenMetadataProgram {
   }
 
   async getPromoExtended(mint: PublicKey): Promise<PromoExtended> {
-    const [[promo], [metadata]] = await Promise.all([
-      this.findPromoAddress(mint),
+    const [promo, metadata] = await Promise.all([
+      this.createPromoAddress(mint),
       this.findMetadataAddress(mint),
     ]);
 
@@ -379,51 +379,48 @@ export class TokenMetadataProgram {
     );
   }
 
-  async findAssociatedTokenAccountAddress(
-    mint: PublicKey,
-    wallet: PublicKey,
-  ): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress(
+  findAssociatedTokenAccountAddress(mint: PublicKey, wallet: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
       [wallet.toBuffer(), this.TOKEN_PROGRAM_ID.toBuffer(), mint.toBuffer()],
       this.SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID,
-    );
+    )[0];
   }
 
-  async findAdminAddress(): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress([Buffer.from(this.ADMIN_PREFIX)], this.PUBKEY);
+  findAdminAddress(): PublicKey {
+    return PublicKey.findProgramAddressSync([Buffer.from(this.ADMIN_PREFIX)], this.PUBKEY)[0];
   }
 
-  async findAuthorityAddress(): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress([Buffer.from(this.AUTHORITY_PREFIX)], this.PUBKEY);
+  findAuthorityAddress(): PublicKey {
+    return PublicKey.findProgramAddressSync([Buffer.from(this.AUTHORITY_PREFIX)], this.PUBKEY)[0];
   }
 
-  async findMetadataAddress(mint: PublicKey): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress(
+  findMetadataAddress(mint: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
       [
         Buffer.from(this.METADATA_PREFIX),
         this.TOKEN_METADATA_PROGRAM_ID.toBuffer(),
         mint.toBuffer(),
       ],
       this.TOKEN_METADATA_PROGRAM_ID,
-    );
+    )[0];
   }
 
-  async findPromoAddress(mint: PublicKey): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress(
+  createPromoAddress(mint: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
       [Buffer.from(this.PROMO_PREFIX), mint.toBuffer()],
       this.PUBKEY,
-    );
+    )[0];
   }
 
-  async findPromoGroupAddress(groupSeed: PublicKey): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress([groupSeed.toBuffer()], this.PUBKEY);
+  findPromoGroupAddress(groupSeed: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync([groupSeed.toBuffer()], this.PUBKEY)[0];
   }
 
-  async findProgramDataAdress(): Promise<[PublicKey, number]> {
-    return await PublicKey.findProgramAddress(
+  findProgramDataAdress(): PublicKey {
+    return PublicKey.findProgramAddressSync(
       [this.PUBKEY.toBytes()],
       new PublicKey('BPFLoaderUpgradeab1e11111111111111111111111'),
-    );
+    )[0];
   }
 }
 

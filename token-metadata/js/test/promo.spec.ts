@@ -1,9 +1,21 @@
 import * as anchor from '@project-serum/anchor';
-import { TokenMetadataProgram, AdminSettings, DataV2, PromoExtended, PromoGroup } from '../src';
+import {
+  ListingReceipt,
+  BidReceipt,
+  PurchaseReceipt,
+} from '@metaplex-foundation/mpl-auction-house';
+import { getAccount } from '@solana/spl-token';
+import {
+  TokenMetadataProgram,
+  AdminSettings,
+  DataV2,
+  PromoExtended,
+  PromoGroup,
+  AuctionHouseProgram,
+} from '../src';
 import { PublicKey, Keypair, Transaction, Connection } from '@solana/web3.js';
 import chai = require('chai');
 import chaiAsPromised = require('chai-as-promised');
-const fs = require('fs');
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 import * as dotenv from 'dotenv';
@@ -37,9 +49,19 @@ describe('promo', () => {
 
   const tokenMetadataProgramPromoOwner = new TokenMetadataProgram(promoOwnerProvider);
 
+  const platformSigner = Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
+  );
+
+  const buyer = Keypair.generate();
+
+  const auctionHouseProgram = new AuctionHouseProgram(connection);
+  let auctionHouse: PublicKey;
+
   const platform = Keypair.fromSecretKey(new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)));
   console.log('promoOwner: ', promoOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
+  console.log('platformSigner: ', platformSigner.publicKey.toString());
 
   let adminSettings: PublicKey;
   let adminSettingsAccount: AdminSettings;
@@ -53,10 +75,6 @@ describe('promo', () => {
 
   const groupMember1 = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.GROUP_MEMBER_1_KEYPAIR)),
-  );
-  console.log('groupMember1', groupMember1.publicKey.toString());
-  const plaformSigner = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
   );
 
   const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(
@@ -72,7 +90,7 @@ describe('promo', () => {
       platform.publicKey,
       promoOwner.publicKey,
       groupMember1.publicKey,
-      plaformSigner.publicKey,
+      platformSigner.publicKey,
     ];
     addresses.forEach((address) => {
       transaction.add(
@@ -93,7 +111,7 @@ describe('promo', () => {
   });
 
   it('creates admin settings', async () => {
-    [adminSettings] = await tokenMetadataProgram.findAdminAddress();
+    adminSettings = await tokenMetadataProgram.findAdminAddress();
 
     await tokenMetadataProgram.createAdminSettings(platform, 10_000_000, 1_000_000);
 
@@ -107,11 +125,11 @@ describe('promo', () => {
   });
 
   it('creates group', async () => {
-    const members = [promoOwner.publicKey, groupMember1.publicKey, plaformSigner.publicKey];
+    const members = [promoOwner.publicKey, groupMember1.publicKey, platformSigner.publicKey];
     const lamports = 500_000_000;
     const memo = 'Created a new group for bokoup store group';
 
-    [group] = await tokenMetadataProgramPromoOwner.createPromoGroup(
+    group = await tokenMetadataProgramPromoOwner.createPromoGroup(
       groupSeed,
       members,
       lamports,
@@ -261,7 +279,7 @@ describe('promo', () => {
       memo: 'burned delegated token',
     };
 
-    const tokenAccount = await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
+    await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
       mint,
       tokenOwner,
       platform.publicKey,
@@ -271,7 +289,7 @@ describe('promo', () => {
 
     const mintAccount = await tokenMetadataProgram.getMintAccount(mint);
 
-    // Fix indexer to delete account from db if it is closed.
+    // TODO: Fix indexer to delete account from db if it is closed.
     // await expect(tokenMetadataProgram.getTokenAccount(tokenAccount)).to.be.rejected
 
     promoExtended = await tokenMetadataProgram.getPromoExtended(mint);
@@ -295,5 +313,139 @@ describe('promo', () => {
     const memo = 'hello';
     const tx = await tokenMetadataProgram.signMemo(memo, promoOwner);
     console.log(tx);
+  });
+
+  it('Creates an auction house', async () => {
+    ({ auctionHouse } = await auctionHouseProgram.createAuctionHouse(platformSigner));
+    console.log('ah_createAuctionHouse: ', auctionHouse.toString());
+  });
+
+  it('creates a sell offer', async () => {
+    // payer is the seller in this case
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    await tokenMetadataProgram
+      .mintPromoToken(mint, groupMember1, groupSeed, 'just a string for a memo')
+      .then((tokenAccount) =>
+        Promise.all([
+          tokenMetadataProgram.getTokenAccount(tokenAccount),
+          tokenMetadataProgram.getMintAccount(promoExtended.mintAccount.address),
+        ]),
+      );
+
+    console.log(
+      'creates a sell offer',
+      tokenMetadataProgram.payer.payer.publicKey.toString(),
+      auctionHouse.toString(),
+    );
+
+    const { listingReceipt, tokenAccount } = await auctionHouseProgram.createSellOffer(
+      tokenMetadataProgram.payer.payer,
+      auctionHouse,
+      platformSigner.publicKey,
+      promoExtended.mint,
+      promoExtended.metadata,
+      salePrice,
+      tokenSize,
+    );
+
+    const listingReceiptAccount = await ListingReceipt.fromAccountAddress(
+      connection,
+      listingReceipt,
+    );
+
+    console.log('ah_listing_receipt: ', listingReceiptAccount);
+
+    const tokenAccountData = await getAccount(connection, tokenAccount);
+    console.log('ah_token_account: ', tokenAccountData);
+  });
+
+  it('creates a buy offer', async () => {
+    // payer is the seller in this case
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    const tx = await connection.requestAirdrop(buyer.publicKey, 1_000_000_000);
+    await connection.confirmTransaction({
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      signature: tx,
+    });
+
+    const { bidReceipt, escrowPaymentAccount } = await auctionHouseProgram.createBuyOffer(
+      buyer,
+      tokenOwner,
+      auctionHouse,
+      platformSigner.publicKey,
+      promoExtended.mint,
+      promoExtended.metadata,
+      salePrice,
+      tokenSize,
+      true,
+    );
+
+    const bidReceiptAccount = await BidReceipt.fromAccountAddress(connection, bidReceipt);
+    console.log('ah_bidReceipt: ', bidReceiptAccount);
+
+    const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
+    expect(escrowAccountInfo!.lamports).to.equal(
+      salePrice + 890880,
+      'escrowAccount lamports incorrect.',
+    );
+  });
+
+  it('executes a sale', async () => {
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    const [auctionHouseFeeAccount] = auctionHouseProgram.findAuctionHouseFeeAddress(auctionHouse);
+    const [auctionHouseTreasury] =
+      auctionHouseProgram.findAuctionHouseTreasuryAddress(auctionHouse);
+
+    for (const account of [auctionHouseFeeAccount, auctionHouseTreasury]) {
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const tx = await connection.requestAirdrop(account, 1_000_000);
+      await connection.confirmTransaction({
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        signature: tx,
+      });
+    }
+
+    const { purchaseReceipt, escrowPaymentAccount, buyerTokenAccount, sellerTokenAccount } =
+      await auctionHouseProgram.executeSale(
+        buyer,
+        tokenOwner,
+        auctionHouse,
+        platformSigner.publicKey,
+        promoExtended.mint,
+        promoExtended.metadata,
+        salePrice,
+        tokenSize,
+        true,
+      );
+
+    const purchaseReceiptAccount = await PurchaseReceipt.fromAccountAddress(
+      connection,
+      purchaseReceipt,
+    );
+    console.log('ah_purchaseReceipt: ', purchaseReceiptAccount);
+
+    const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
+    expect(escrowAccountInfo!.lamports).to.equal(890880, 'escrowAccount lamports incorrect.');
+
+    const sellerTokenAccountData = await getAccount(connection, sellerTokenAccount);
+    expect(Number(sellerTokenAccountData!.amount)).to.equal(
+      0,
+      'sellerTokenAccount amount incorrect.',
+    );
+
+    const buyerTokenAccountData = await getAccount(connection, buyerTokenAccount);
+    expect(Number(buyerTokenAccountData!.amount)).to.equal(
+      tokenSize,
+      'buyerTokenAccount amount incorrect.',
+    );
   });
 });

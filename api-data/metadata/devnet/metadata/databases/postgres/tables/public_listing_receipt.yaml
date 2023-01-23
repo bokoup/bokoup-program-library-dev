@@ -1,3 +1,25 @@
 table:
   name: listing_receipt
   schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - id
+        - trade_state
+        - bookkeeper
+        - auction_house
+        - seller
+        - metadata
+        - purchase_receipt
+        - price
+        - token_size
+        - bump
+        - trade_state_bump
+        - created_at_on_chain
+        - canceled_at_on_chain
+        - slot
+        - write_version
+        - created_at
+        - modified_at
+      filter: {}
