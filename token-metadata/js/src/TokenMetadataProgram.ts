@@ -1,5 +1,5 @@
 import fetch from 'cross-fetch';
-import { PublicKey, Keypair, Connection } from '@solana/web3.js';
+import { PublicKey, Keypair } from '@solana/web3.js';
 import { Program, Provider, Wallet, Idl, AnchorProvider, BN } from '@project-serum/anchor';
 import {
   Metadata,

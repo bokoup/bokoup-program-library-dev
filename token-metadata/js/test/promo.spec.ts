@@ -320,50 +320,6 @@ describe('promo', () => {
     console.log('ah_createAuctionHouse: ', auctionHouse.toString());
   });
 
-  // it('creates pdsa correctly', async () => {
-  //   const ata = auctionHouseProgram.findAssociatedTokenAccountAddress(mint, tokenOwner);
-  //   const [ataOld] = await AHPOld.findAssociatedTokenAccountAddress(mint, tokenOwner);
-  //   expect(ata.toString()).to.equal(ataOld.toString(), 'associated token account not equal');
-
-  //   const ah = auctionHouseProgram.findAuctionHouseAddress(platformSigner.publicKey, NATIVE_MINT);
-  //   const aHaOld = await AHPOld.findAuctionHouseAddress(platformSigner.publicKey, NATIVE_MINT);
-  //   expect(ah.toString()).to.equal(aHaOld.toString(), 'auction house account not equal');
-
-  //   const ahF = auctionHouseProgram.findAuctionHouseFeeAddress(ah[0]);
-  //   const aHFOld = await AHPOld.findAuctionHouseFeeAddress(ah[0]);
-  //   expect(ahF.toString()).to.equal(aHFOld.toString(), 'auction house fee address');
-
-  //   const ahps = auctionHouseProgram.findAuctionHouseProgramAsSignerAddress();
-  //   const ahpsOld = await AHPOld.findAuctionHouseProgramAsSignerAddress();
-  //   expect(ahps.toString()).to.equal(ahpsOld.toString(), 'program as signer');
-
-  //   const salePrice = 1_000_000;
-  //   const tokenSize = 1;
-
-  //   const sellerTradeState = auctionHouseProgram.findTradeStateAddress(
-  //     tokenOwner,
-  //     auctionHouse,
-  //     ata,
-  //     NATIVE_MINT,
-  //     mint,
-  //     salePrice,
-  //     tokenSize,
-  //   );
-  //   const sellerTradeStateOld = await AHPOld.findTradeStateAddress(
-  //     tokenOwner,
-  //     auctionHouse,
-  //     ata,
-  //     NATIVE_MINT,
-  //     mint,
-  //     salePrice,
-  //     tokenSize,
-  //   );
-  //   expect(sellerTradeState.toString()).to.equal(
-  //     sellerTradeStateOld.toString(),
-  //     'seller trade state',
-  //   );
-  // });
-
   it('creates a sell offer', async () => {
     // payer is the seller in this case
     const salePrice = 1_000_000;

@@ -36,7 +36,6 @@ import {
   PrintPurchaseReceiptInstructionAccounts,
   PrintPurchaseReceiptInstructionArgs,
   createPrintPurchaseReceiptInstruction,
-  PurchaseReceipt,
 } from '@metaplex-foundation/mpl-auction-house';
 import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 
@@ -466,7 +465,7 @@ export class AuctionHouseProgram {
       programAsSigner,
     };
 
-    const args = {
+    const args: ExecuteSaleInstructionArgs = {
       escrowPaymentBump,
       freeTradeStateBump,
       programAsSignerBump,
