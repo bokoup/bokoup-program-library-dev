@@ -1,5 +1,9 @@
 import * as anchor from '@project-serum/anchor';
-import { ListingReceipt, BidReceipt, AuctionHouse } from '@metaplex-foundation/mpl-auction-house';
+import {
+  ListingReceipt,
+  BidReceipt,
+  PurchaseReceipt,
+} from '@metaplex-foundation/mpl-auction-house';
 import { getAccount } from '@solana/spl-token';
 import {
   TokenMetadataProgram,
@@ -433,6 +437,59 @@ describe('promo', () => {
     expect(escrowAccountInfo!.lamports).to.equal(
       salePrice + 890880,
       'escrowAccount lamports incorrect.',
+    );
+  });
+
+  it('executes a sale', async () => {
+    const salePrice = 1_000_000;
+    const tokenSize = 1;
+
+    const [auctionHouseFeeAccount] = auctionHouseProgram.findAuctionHouseFeeAddress(auctionHouse);
+    const [auctionHouseTreasury] =
+      auctionHouseProgram.findAuctionHouseTreasuryAddress(auctionHouse);
+
+    for (const account of [auctionHouseFeeAccount, auctionHouseTreasury]) {
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const tx = await connection.requestAirdrop(account, 1_000_000);
+      await connection.confirmTransaction({
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+        signature: tx,
+      });
+    }
+
+    const { purchaseReceipt, escrowPaymentAccount, buyerTokenAccount, sellerTokenAccount } =
+      await auctionHouseProgram.executeSale(
+        buyer,
+        tokenOwner,
+        auctionHouse,
+        platformSigner.publicKey,
+        promoExtended.mint,
+        promoExtended.metadata,
+        salePrice,
+        tokenSize,
+        true,
+      );
+
+    const purchaseReceiptAccount = await PurchaseReceipt.fromAccountAddress(
+      connection,
+      purchaseReceipt,
+    );
+    console.log('ah_purchaseReceipt: ', purchaseReceiptAccount);
+
+    const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
+    expect(escrowAccountInfo!.lamports).to.equal(890880, 'escrowAccount lamports incorrect.');
+
+    const sellerTokenAccountData = await getAccount(connection, sellerTokenAccount);
+    expect(Number(sellerTokenAccountData!.amount)).to.equal(
+      0,
+      'sellerTokenAccount amount incorrect.',
+    );
+
+    const buyerTokenAccountData = await getAccount(connection, buyerTokenAccount);
+    expect(Number(buyerTokenAccountData!.amount)).to.equal(
+      tokenSize,
+      'buyerTokenAccount amount incorrect.',
     );
   });
 });

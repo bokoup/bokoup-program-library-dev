@@ -27,12 +27,18 @@ import {
   BuyInstructionArgs,
   BuyInstructionAccounts,
   createPublicBuyInstruction,
-  PublicBuyInstructionArgs,
-  PublicBuyInstructionAccounts,
   PrintBidReceiptInstructionArgs,
   PrintBidReceiptInstructionAccounts,
   createPrintBidReceiptInstruction,
+  createExecuteSaleInstruction,
+  ExecuteSaleInstructionAccounts,
+  ExecuteSaleInstructionArgs,
+  PrintPurchaseReceiptInstructionAccounts,
+  PrintPurchaseReceiptInstructionArgs,
+  createPrintPurchaseReceiptInstruction,
+  PurchaseReceipt,
 } from '@metaplex-foundation/mpl-auction-house';
+import { Metadata } from '@metaplex-foundation/mpl-token-metadata';
 
 import { NATIVE_MINT } from '@solana/spl-token';
 
@@ -348,6 +354,166 @@ export class AuctionHouseProgram {
     });
 
     return { tx, bidReceipt, escrowPaymentAccount };
+  }
+
+  /**
+   * Executes sale
+   *
+   * @param connection   Anchor program to use
+   * @param buyer        Buyer
+   * @param seller       Seller
+   * @param auctionHouse Auction house
+   * @param authority    Auction house authority
+   * @param mint         Semi-fungible mint
+   * @param metadata     Semi-fungible metadata
+   * @param salePrice    Sale price for tokenSize tokens
+   * @param tokenSize    Number of tokens to offer for sale
+   *
+   * @return Address of purchase receipt, address of escrow payment account,
+   *   buyer token account, seller token account
+   */
+  async executeSale(
+    buyer: Keypair,
+    seller: PublicKey,
+    auctionHouse: PublicKey,
+    authority: PublicKey,
+    mint: PublicKey,
+    metadata: PublicKey,
+    salePrice: number,
+    tokenSize: number,
+    publicBuy = false,
+  ): Promise<{
+    tx: string;
+    purchaseReceipt: PublicKey;
+    escrowPaymentAccount: PublicKey;
+    buyerTokenAccount: PublicKey;
+    sellerTokenAccount: PublicKey;
+  }> {
+    const buyerTokenAccount = this.findAssociatedTokenAccountAddress(mint, buyer.publicKey);
+    const sellerTokenAccount = this.findAssociatedTokenAccountAddress(mint, seller);
+    const [auctionHouseFeeAccount] = this.findAuctionHouseFeeAddress(auctionHouse);
+    const [auctionHouseTreasury] = this.findAuctionHouseTreasuryAddress(auctionHouse);
+    const [programAsSigner, programAsSignerBump] = this.findAuctionHouseProgramAsSignerAddress();
+
+    const [buyerTradeState] = publicBuy
+      ? this.findPublicBidTradeStateAddress(
+          buyer.publicKey,
+          auctionHouse,
+          NATIVE_MINT,
+          mint,
+          salePrice,
+          tokenSize,
+        )
+      : this.findTradeStateAddress(
+          buyer.publicKey,
+          auctionHouse,
+          sellerTokenAccount,
+          NATIVE_MINT,
+          mint,
+          salePrice,
+          tokenSize,
+        );
+
+    const [sellerTradeState] = this.findTradeStateAddress(
+      seller,
+      auctionHouse,
+      sellerTokenAccount,
+      NATIVE_MINT,
+      mint,
+      salePrice,
+      tokenSize,
+    );
+    const [freeTradeState, freeTradeStateBump] = this.findTradeStateAddress(
+      seller,
+      auctionHouse,
+      sellerTokenAccount,
+      NATIVE_MINT,
+      mint,
+      0,
+      tokenSize,
+    );
+    const [escrowPaymentAccount, escrowPaymentBump] = this.findEscrowPaymentAccountAddress(
+      auctionHouse,
+      buyer.publicKey,
+    );
+
+    const [bidReceipt] = this.findBidReceiptAddress(buyerTradeState);
+    const [listingReceipt] = this.findListingReceiptAddress(sellerTradeState);
+    const [purchaseReceipt, purchaseReceiptBump] = this.findPurchaseReceiptAddress(
+      sellerTradeState,
+      buyerTradeState,
+    );
+
+    const metaDataInfo = await Metadata.fromAccountAddress(this.connection, metadata);
+
+    const accounts: ExecuteSaleInstructionAccounts = {
+      buyer: buyer.publicKey,
+      seller,
+      tokenAccount: sellerTokenAccount,
+      tokenMint: mint,
+      metadata: metadata,
+      treasuryMint: NATIVE_MINT,
+      escrowPaymentAccount: escrowPaymentAccount,
+      sellerPaymentReceiptAccount: seller,
+      buyerReceiptTokenAccount: buyerTokenAccount,
+      authority,
+      auctionHouse,
+      auctionHouseFeeAccount,
+      auctionHouseTreasury,
+      buyerTradeState,
+      sellerTradeState,
+      freeTradeState,
+      programAsSigner,
+    };
+
+    const args = {
+      escrowPaymentBump,
+      freeTradeStateBump,
+      programAsSignerBump,
+      buyerPrice: salePrice,
+      tokenSize,
+    };
+
+    const transaction = new Transaction({ feePayer: buyer.publicKey } as TransactionBlockhashCtor);
+    const instruction = createExecuteSaleInstruction(accounts, args);
+
+    metaDataInfo.data.creators?.forEach((c) => {
+      instruction.keys.push({
+        pubkey: c.address,
+        isWritable: true,
+        isSigner: false,
+      });
+    });
+
+    transaction.add(instruction);
+
+    const purchaseReceiptAccounts: PrintPurchaseReceiptInstructionAccounts = {
+      purchaseReceipt,
+      listingReceipt,
+      bidReceipt,
+      bookkeeper: buyer.publicKey,
+      instruction: SYSVAR_INSTRUCTIONS_PUBKEY,
+    };
+
+    const purchaseReceiptArgs: PrintPurchaseReceiptInstructionArgs = {
+      purchaseReceiptBump,
+    };
+
+    transaction.add(
+      createPrintPurchaseReceiptInstruction(purchaseReceiptAccounts, purchaseReceiptArgs),
+    );
+
+    const latestBlockhash = await this.connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.sign(buyer);
+    const tx = await this.connection.sendRawTransaction(transaction.serialize());
+    await this.connection.confirmTransaction({
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      signature: tx,
+    });
+
+    return { tx, purchaseReceipt, escrowPaymentAccount, buyerTokenAccount, sellerTokenAccount };
   }
 
   findAuctionHouseAddress(creator: PublicKey, treasuryMint: PublicKey): [PublicKey, number] {
