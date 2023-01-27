@@ -58,6 +58,7 @@ impl IntoResponse for AppError {
             _ => StatusCode::BAD_REQUEST,
         };
 
+        tracing::debug!(error = self.to_string());
         let body = Json(json!({
             "error": self.to_string(),
         }));
