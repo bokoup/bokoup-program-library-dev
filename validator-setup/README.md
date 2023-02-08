@@ -26,7 +26,7 @@ Need to install build-essentials pkg-config libssl-dev
 1. `sudo cp /home/ubuntu/bokoup-program-library/target/release/bpl-indexer /usr/local/bin`
 1. `sudo cp /home/ubuntu/geyser-plugin-nats/target/release/libgeyser_plugin_nats.so /home/sol`
 
-1. `sudo systemctl start bpl-indexer`1
+1. `sudo systemctl start bpl-indexer`
 
 If there were changes to config.json 5.
 `cp /home/ubuntu/geyser-plugin-nats/config.json /home/sol` 6. Update `config.json` to point to the
@@ -52,3 +52,8 @@ sudo systemctl restart sol
 
 No new snapshots are downloaded if ledger is up to date, but take 5 to 10 minutes to reload ledger
 and catch back up.
+
+## diagnostics
+```
+curl -sL yabs.sh | bash -s — -ig
+```

@@ -3,6 +3,7 @@ import { PublicKey, Keypair } from '@solana/web3.js';
 import { Program, Provider, Wallet, Idl, AnchorProvider, BN } from '@project-serum/anchor';
 import {
   Metadata,
+  MasterEditionV2,
   PROGRAM_ID as METADATA_PROGRAM_ID,
 } from '@metaplex-foundation/mpl-token-metadata';
 import {
@@ -34,6 +35,7 @@ export class TokenMetadataProgram {
   readonly ADMIN_PREFIX: string;
   readonly AUTHORITY_PREFIX: string;
   readonly METADATA_PREFIX: string;
+  readonly EDITION_PREFIX: string;
   readonly PROMO_PREFIX: string;
 
   program: Program;
@@ -51,6 +53,7 @@ export class TokenMetadataProgram {
     this.ADMIN_PREFIX = 'admin';
     this.AUTHORITY_PREFIX = 'authority';
     this.METADATA_PREFIX = 'metadata';
+    this.EDITION_PREFIX = 'edition';
     this.PROMO_PREFIX = 'promo';
 
     this.program = new Program(idl as Idl, this.PUBKEY, provider);
@@ -304,6 +307,39 @@ export class TokenMetadataProgram {
     return tx;
   }
 
+  /**
+   * Create non-fungible
+   *
+   * @param memo  Memo
+   *
+   * @return      Signature
+   */
+  async createNonFungible(
+    metadataData: DataV2,
+    payer: Keypair,
+  ): Promise<[string, PublicKey, PublicKey, PublicKey]> {
+    const mint = Keypair.generate();
+    const tokenAccount = this.findAssociatedTokenAccountAddress(mint.publicKey, payer.publicKey);
+    const metadataAccount = this.findMetadataAddress(mint.publicKey);
+    const editionAccount = this.findMasterEditionAccountAddress(mint.publicKey);
+
+    const tx = await this.program.methods
+      .createNonFungible(metadataData, true, null)
+      .accounts({
+        payer: payer.publicKey,
+        mint: mint.publicKey,
+        tokenAccount,
+        metadataAccount,
+        editionAccount,
+        metadataProgram: this.TOKEN_METADATA_PROGRAM_ID,
+        memoProgram: this.MEMO_PROGRAM_ID,
+      })
+      .signers([payer, mint])
+      .rpc();
+
+    return [tx, mint.publicKey, metadataAccount, editionAccount];
+  }
+
   async getTokenAccount(address: PublicKey): Promise<TokenAccount> {
     return await getTokenAccount(this.program.provider.connection, address);
   }
@@ -314,6 +350,10 @@ export class TokenMetadataProgram {
 
   async getMetadataAccount(address: PublicKey): Promise<Metadata> {
     return await Metadata.fromAccountAddress(this.program.provider.connection, address);
+  }
+
+  async getMasterEditionAccount(address: PublicKey): Promise<MasterEditionV2> {
+    return await MasterEditionV2.fromAccountAddress(this.program.provider.connection, address);
   }
 
   async getPromoExtended(mint: PublicKey): Promise<PromoExtended> {
@@ -404,6 +444,43 @@ export class TokenMetadataProgram {
       this.TOKEN_METADATA_PROGRAM_ID,
     )[0];
   }
+
+  findMasterEditionAccountAddress(mint: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(this.METADATA_PREFIX),
+        this.TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        mint.toBuffer(),
+        Buffer.from(this.EDITION_PREFIX),
+      ],
+      this.TOKEN_METADATA_PROGRAM_ID,
+    )[0];
+  }
+
+  //   pub fn find_edition_account(mint: &Pubkey, edition_number: String) -> (Pubkey, u8) {
+  //     Pubkey::find_program_address(
+  //         &[
+  //             PREFIX.as_bytes(),
+  //             crate::id().as_ref(),
+  //             mint.as_ref(),
+  //             EDITION.as_bytes(),
+  //             edition_number.as_bytes(),
+  //         ],
+  //         &crate::id(),
+  //     )
+  // }
+
+  // pub fn find_master_edition_account(mint: &Pubkey) -> (Pubkey, u8) {
+  //     Pubkey::find_program_address(
+  //         &[
+  //             PREFIX.as_bytes(),
+  //             crate::id().as_ref(),
+  //             mint.as_ref(),
+  //             EDITION.as_bytes(),
+  //         ],
+  //         &crate::id(),
+  //     )
+  // }
 
   createPromoAddress(mint: PublicKey): PublicKey {
     return PublicKey.findProgramAddressSync(

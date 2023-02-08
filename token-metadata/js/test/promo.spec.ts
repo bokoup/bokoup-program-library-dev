@@ -448,4 +448,27 @@ describe('promo', () => {
       'buyerTokenAccount amount incorrect.',
     );
   });
+
+  it('creates a non-fungible', async () => {
+    // payer is the seller in this case
+    const metadataData2: DataV2 = {
+      name: 'Test Merchant',
+      symbol: 'BTM',
+      uri: 'https://arweave.net/frDiuZYzSVwYTwSUMR1YbggVkZqZfA7S9xsI3drPWBo',
+      sellerFeeBasisPoints: 0,
+      creators: null,
+      collection: null,
+      uses: null,
+    };
+
+    const [tx, mint, metadata, edition] = await tokenMetadataProgramPromoOwner.createNonFungible(
+      metadataData2,
+      promoOwner,
+    );
+    const [metadataAccount, editionAccount] = await Promise.all([
+      tokenMetadataProgramPromoOwner.getMetadataAccount(metadata),
+      tokenMetadataProgramPromoOwner.getMasterEditionAccount(edition),
+    ]);
+    console.log(metadataAccount, editionAccount);
+  });
 });
