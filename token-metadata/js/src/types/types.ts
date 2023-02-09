@@ -41,6 +41,7 @@ export type Device = {
 export type Campaign = {
   merchant: PublicKey;
   name: String;
+  uri: String;
   locations: Array<PublicKey>;
   active: boolean;
 };

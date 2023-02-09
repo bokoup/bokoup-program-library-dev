@@ -6,15 +6,21 @@ SET check_function_bodies = false;
 -- =============================
 
 DROP TABLE IF EXISTS public.burn_delegated_promo_token CASCADE;
+DROP TABLE IF EXISTS public.campaign CASCADE;
+DROP TABLE IF EXISTS public.create_campaign CASCADE;
+DROP TABLE IF EXISTS public.create_device CASCADE;
+DROP TABLE IF EXISTS public.create_location CASCADE;
+DROP TABLE IF EXISTS public.create_merchant CASCADE;
 DROP TABLE IF EXISTS public.create_promo CASCADE;
 DROP TABLE IF EXISTS public.create_promo_group CASCADE;
 DROP TABLE IF EXISTS public.delegate_promo_token CASCADE;
-DROP TABLE IF EXISTS public.group CASCADE;
+DROP TABLE IF EXISTS public.device CASCADE;
+DROP TABLE IF EXISTS public.location CASCADE;
+DROP TABLE IF EXISTS public.merchant CASCADE;
 DROP TABLE IF EXISTS public.mint_promo_token CASCADE;
 DROP TABLE IF EXISTS public.promo CASCADE;
 DROP TABLE IF EXISTS public.promo_group CASCADE;
 DROP TABLE IF EXISTS public.sign_memo CASCADE;
-DROP TABLE IF EXISTS public.promo_transactions;
 
 -- =============================
 -- mpl_auction_house

@@ -30,12 +30,14 @@ pub async fn upsert(
 
     let signature = signature.to_string();
     let payer = &accounts[0];
-    let promo_group = &accounts[1];
-    let token_owner = &accounts[2];
-    let mint = &accounts[3];
-    let authority = &accounts[4];
-    let promo = &accounts[5];
-    let token_account = &accounts[6];
+    let location = &accounts[1];
+    let device = &accounts[2];
+    let campaign = &accounts[3];
+    let token_owner = &accounts[4];
+    let mint = &accounts[5];
+    let authority = &accounts[6];
+    let promo = &accounts[7];
+    let token_account = &accounts[8];
     let slot = slot as i64;
 
     let result = client
@@ -44,7 +46,9 @@ pub async fn upsert(
             &[
                 &signature,
                 payer,
-                promo_group,
+                location,
+                device,
+                campaign,
                 token_owner,
                 mint,
                 authority,

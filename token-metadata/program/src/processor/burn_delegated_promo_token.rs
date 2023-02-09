@@ -3,7 +3,7 @@ use crate::{error::ProgramError, BurnDelegatedPromoToken};
 use anchor_lang::prelude::*;
 
 impl<'info> BurnDelegatedPromoToken<'info> {
-    pub fn process(&mut self, memo: Option<String>, authority_seeds: [&[u8]; 2]) -> Result<()> {
+    pub fn process(&mut self, memo: Option<String>) -> Result<()> {
         msg!("Burn delegated promo token");
 
         // Check to see if burn_count is still below max_burn.

@@ -1,22 +1,22 @@
-INSERT INTO create_promo_group (
+INSERT INTO create_campaign (
     signature,
     payer,
-    seed,
-    promo_group,
+    merchant,
+    campaign,
     lamports,
     memo,
     slot
 )
     VALUES($1, $2, $3, $4, $5, $6, $7)
-ON CONFLICT ON CONSTRAINT create_promo_group_pkey DO UPDATE 
+ON CONFLICT ON CONSTRAINT create_campaign_pkey DO UPDATE 
     SET
         payer = EXCLUDED.payer,
-        seed = EXCLUDED.seed,
-        promo_group = EXCLUDED.promo_group,
+        merchant = EXCLUDED.merchant,
+        campaign = EXCLUDED.campaign,
         lamports = EXCLUDED.lamports,
         memo = EXCLUDED.memo,
         slot = EXCLUDED.slot,
         modified_at = NOW()
     WHERE
-        EXCLUDED.slot > create_promo_group.slot
+        EXCLUDED.slot > create_campaign.slot
 RETURNING created_at = modified_at

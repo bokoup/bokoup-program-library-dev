@@ -62,10 +62,7 @@ pub async fn apply_migrations(client: &mut Client) -> Result<(), Error> {
 mod tests {
     use super::*;
     use anchor_spl::associated_token::get_associated_token_address;
-    use bpl_token_metadata::{
-        state::{Campaign, Promo},
-        utils::find_group_address,
-    };
+    use bpl_token_metadata::state::{Campaign, Merchant, Promo};
     use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
     use mpl_auction_house::{
         pda::{
@@ -99,31 +96,59 @@ mod tests {
     // Accounts
     // =============================
 
-    async fn it_upserts_promo_group(
+    async fn it_upserts_merchant(
+        client: &Client,
+        key: &[u8],
+        account: &Merchant,
+        slot: u64,
+        write_version: u64,
+    ) {
+        queries::bpl_token_metadata::merchant::upsert(client, key, account, slot, write_version)
+            .await;
+        let row = client
+            .query_one(
+                "SELECT * FROM merchant WHERE id = $1",
+                &[&bs58::encode(key).into_string()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.get::<&str, String>("name"),
+            account.name,
+            "it_upserts_merchant: name failed"
+        );
+        assert_eq!(
+            row.get::<&str, String>("owner"),
+            account.owner.to_string(),
+            "it_upserts_merchant: owner failed"
+        );
+    }
+
+    async fn it_upserts_campaign(
         client: &Client,
         key: &[u8],
         account: &Campaign,
         slot: u64,
         write_version: u64,
     ) {
-        queries::bpl_token_metadata::promo_group::upsert(client, key, account, slot, write_version)
+        queries::bpl_token_metadata::campaign::upsert(client, key, account, slot, write_version)
             .await;
         let row = client
             .query_one(
-                "SELECT * FROM promo_group WHERE id = $1",
+                "SELECT * FROM campaign WHERE id = $1",
                 &[&bs58::encode(key).into_string()],
             )
             .await
             .unwrap();
         assert_eq!(
-            row.get::<&str, i32>("nonce"),
-            account.nonce as i32,
-            "it_upserts_group: nonce failed"
+            row.get::<&str, String>("name"),
+            account.name,
+            "it_upserts_campaign: name failed"
         );
         assert_eq!(
-            row.get::<&str, String>("owner"),
-            account.owner.to_string(),
-            "it_upserts_group: owner failed"
+            row.get::<&str, String>("merchant"),
+            account.merchant.to_string(),
+            "it_upserts_campaign: merchant failed"
         );
     }
 
@@ -383,8 +408,8 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
-        } else if table == "create_promo_group" {
-            queries::bpl_token_metadata::create_promo_group::upsert(
+        } else if table == "create_campaign" {
+            queries::bpl_token_metadata::create_campaign::upsert(
                 client, signature, accounts, data, slot,
             )
             .await;
@@ -433,12 +458,12 @@ mod tests {
         let mut client = pg_pool.get().await.unwrap();
         reset(&mut client).await.unwrap();
 
-        // insert a create_promo transaction
+        // insert transactions
         let data: &[u8] = &[0; 8];
-        let accounts: Vec<Pubkey> = (0..10).map(|_| Pubkey::new_unique()).collect();
+        let accounts: Vec<Pubkey> = (0..12).map(|_| Pubkey::new_unique()).collect();
 
         for table in vec![
-            "create_promo_group",
+            "create_campaign",
             "create_promo",
             "mint_promo_token",
             "delegate_promo_token",
@@ -448,20 +473,33 @@ mod tests {
                 .await;
         }
 
-        // upsert group
+        // upsert merchant
         let owner = Pubkey::new_unique();
-        let member = Pubkey::new_unique();
-        let seed = Pubkey::new_unique();
-        let (group_pubkey, nonce) = find_group_address(&seed);
 
-        let group = Campaign {
+        let campaign = Merchant {
             owner,
-            seed,
-            nonce,
-            members: vec![owner, member],
+            name: "Test Merchant".to_string(),
+            uri: "https://arweave.net/u27CJpMzXZnmrTwqXzHjXQnECxP0_iMzSjE-WMAec24".to_string(),
+            active: true,
         };
 
-        it_upserts_promo_group(&client, group_pubkey.as_ref(), &group, 42, 1).await;
+        it_upserts_merchant(&client, Pubkey::new_unique().as_ref(), &campaign, 42, 1).await;
+
+        // upsert campaign
+        let merchant = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
+        let campaign_pubkey = Pubkey::new_unique();
+
+        let campaign = Campaign {
+            merchant,
+            name: "Test Campaign".to_string(),
+            uri: "https://campaign.example.com".to_string(),
+
+            locations: vec![location],
+            active: true,
+        };
+
+        it_upserts_campaign(&client, campaign_pubkey.as_ref(), &campaign, 42, 1).await;
 
         // update a mint, null out an optional value
         mint.supply = 2;
@@ -533,10 +571,10 @@ mod tests {
 
         // insert edition_metadata
         let key = Pubkey::new_unique();
-        let owner = Pubkey::new_unique();
+        let campaign = Pubkey::new_unique();
 
         let promo = Promo {
-            owner,
+            campaign,
             mint: mint_pubkey,
             metadata: metadata_pubkey,
             mint_count: 0,

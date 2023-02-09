@@ -89,7 +89,7 @@ export class TokenMetadataProgram {
     burnPromoTokenLamports: number,
   ): Promise<PublicKey> {
     const adminSettings = this.findAdminAddress();
-    const programData = this.findProgramDataAdress();
+    // const programData = this.findProgramDataAdress();
 
     await this.program.methods
       .createAdminSettings({
@@ -115,6 +115,7 @@ export class TokenMetadataProgram {
     deviceName: string,
     deviceUri: string,
     campaignName: string,
+    campaignUri: string,
     lamports: number,
     memo: string | null,
   ): Promise<[string, PublicKey, PublicKey, PublicKey, PublicKey]> {
@@ -141,6 +142,7 @@ export class TokenMetadataProgram {
     const campaignData: Campaign = {
       merchant,
       name: campaignName,
+      uri: campaignUri,
       locations: [location],
       active: true,
     };
@@ -161,6 +163,7 @@ export class TokenMetadataProgram {
 
   async createCampaign(
     name: string,
+    uri: String,
     locations: Array<PublicKey>,
     active: boolean,
     lamports: number,
@@ -172,6 +175,7 @@ export class TokenMetadataProgram {
     const campaignData: Campaign = {
       merchant,
       name,
+      uri,
       locations,
       active,
     };

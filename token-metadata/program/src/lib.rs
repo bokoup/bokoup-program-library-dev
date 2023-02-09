@@ -109,9 +109,7 @@ pub mod bpl_token_metadata {
         ctx: Context<'a, 'b, 'c, 'info, BurnDelegatedPromoToken<'info>>,
         memo: Option<String>,
     ) -> Result<()> {
-        let authority_seeds = [AUTHORITY_PREFIX.as_bytes(), &[ctx.bumps[AUTHORITY_PREFIX]]];
-
-        ctx.accounts.process(memo, authority_seeds)
+        ctx.accounts.process(memo)
     }
 
     /// Signs a memo.

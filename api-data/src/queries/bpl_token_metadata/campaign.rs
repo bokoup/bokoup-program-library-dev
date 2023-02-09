@@ -2,7 +2,7 @@ use bpl_token_metadata::state::Campaign;
 use tokio_postgres::{types::Json, Client};
 use tracing::{error, info};
 
-const UPSERT_QUERY: &str = include_str!("promo_group_upsert.sql");
+const UPSERT_QUERY: &str = include_str!("campaign_upsert.sql");
 
 #[tracing::instrument(skip_all)]
 pub async fn upsert(
@@ -13,10 +13,8 @@ pub async fn upsert(
     write_version: u64,
 ) {
     let id = bs58::encode(key).into_string();
-    let owner = account.owner.to_string();
-    let seed = account.seed.to_string();
-    let nonce = account.nonce as i32;
-    let members = account.members.iter().map(ToString::to_string).collect();
+    let merchant = account.merchant.to_string();
+    let locations = account.locations.iter().map(ToString::to_string).collect();
     let slot = slot as i64;
     let write_version = write_version as i64;
 
@@ -25,10 +23,11 @@ pub async fn upsert(
             UPSERT_QUERY,
             &[
                 &id,
-                &owner,
-                &seed,
-                &nonce,
-                &Json::<Vec<String>>(members),
+                &merchant,
+                &account.name,
+                &account.name,
+                &Json::<Vec<String>>(locations),
+                &account.active,
                 &slot,
                 &write_version,
             ],

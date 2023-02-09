@@ -78,6 +78,7 @@ impl Location {
 // name must be unique: address is is pda of merchant address and name string
 // going to include physical address in metadata
 // can also include reference, i.e. location number in metadata
+// owner is the pubkey address of the keypair on the device
 #[account]
 #[derive(PartialEq, Debug)]
 pub struct Device {
@@ -106,12 +107,13 @@ impl Device {
 pub struct Campaign {
     pub merchant: Pubkey,
     pub name: String,
+    pub uri: String,
     pub locations: Vec<Pubkey>,
     pub active: bool,
 }
 
 impl Campaign {
-    pub const LEN: usize = 8 + 32 + MAX_NAME_LENGTH + 32 * LOCATIONS_CAPACITY + 1;
+    pub const LEN: usize = 8 + 32 + MAX_NAME_LENGTH + MAX_URI_LENGTH + 32 * LOCATIONS_CAPACITY + 1;
 }
 
 //==============================

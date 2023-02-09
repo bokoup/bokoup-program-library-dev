@@ -1,6 +1,6 @@
 INSERT INTO promo (
     id,
-    owner,
+    campaign,
     mint,
     metadata,
     mint_count,
@@ -13,7 +13,7 @@ INSERT INTO promo (
     VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT ON CONSTRAINT promo_pkey DO UPDATE 
     SET
-        owner = EXCLUDED.owner,
+        campaign = EXCLUDED.campaign,
         mint = EXCLUDED.mint,
         metadata = EXCLUDED.metadata,
         mint_count = EXCLUDED.mint_count,

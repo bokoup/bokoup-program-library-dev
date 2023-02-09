@@ -5,23 +5,69 @@ SET check_function_bodies = false;
 -- bpl_token_metadata
 -- =============================
 
-CREATE TABLE public.promo_group (
+CREATE TABLE public.merchant (
     id text NOT NULL,
     owner text NOT NULL,
-    seed text NOT NULL,
-    nonce int NOT NULL,
-    members jsonb NOT NULL,
+    name text NOT NULL,
+    uri text NOT NULL,
+    metadata_json jsonb,
+    active boolean NOT NULL,
     slot bigint NOT NULL,
     write_version bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     modified_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE ONLY public.promo_group
-    ADD CONSTRAINT promo_group_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.merchant
+    ADD CONSTRAINT merchant_pkey PRIMARY KEY (id);
+
+CREATE TABLE public.location (
+    id text NOT NULL,
+    merchant text NOT NULL,
+    name text NOT NULL,
+    uri text NOT NULL,
+    active boolean NOT NULL,
+    slot bigint NOT NULL,
+    write_version bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.location
+    ADD CONSTRAINT location_pkey PRIMARY KEY (id);
+
+CREATE TABLE public.device (
+    id text NOT NULL,
+    owner text NOT NULL,
+    location text NOT NULL,
+    name text NOT NULL,
+    uri text NOT NULL,
+    active boolean NOT NULL,
+    slot bigint NOT NULL,
+    write_version bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.device
+    ADD CONSTRAINT device_pkey PRIMARY KEY (id);
+
+
+CREATE TABLE public.campaign (
+    id text NOT NULL,
+    merchant text NOT NULL,
+    name text NOT NULL,
+    uri text NOT NULL,
+    locations jsonb NOT NULL,
+    active boolean NOT NULL,
+    slot bigint NOT NULL,
+    write_version bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.campaign
+    ADD CONSTRAINT campaign_pkey PRIMARY KEY (id);
 
 CREATE TABLE public.promo (
     id text NOT NULL,
-    owner text NOT NULL,
+    campaign text NOT NULL,
     mint text NOT NULL,
     metadata text NOT NULL,
     mint_count int NOT NULL,
@@ -36,24 +82,41 @@ CREATE TABLE public.promo (
 ALTER TABLE ONLY public.promo
     ADD CONSTRAINT promo_pkey PRIMARY KEY (id);
 
-CREATE TABLE public.create_promo_group (
+CREATE TABLE public.create_merchant (
     signature text NOT NULL,
     payer text NOT NULL,
-    seed text NOT NULL,
-    promo_group text NOT NULL,
+    merchant text NOT NULL,
+    location text NOT NULL,
+    device text NOT NULL,
+    campaign text NOT NULL,
     lamports bigint NOT NULL,
     memo jsonb,
     slot bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     modified_at timestamp with time zone DEFAULT now() NOT NULL
 );
-ALTER TABLE ONLY public.create_promo_group
-    ADD CONSTRAINT create_promo_group_pkey PRIMARY KEY (signature);
+ALTER TABLE ONLY public.create_merchant
+    ADD CONSTRAINT create_merchant_pkey PRIMARY KEY (signature);
+
+CREATE TABLE public.create_campaign (
+    signature text NOT NULL,
+    payer text NOT NULL,
+    merchant text NOT NULL,
+    campaign text NOT NULL,
+    lamports bigint NOT NULL,
+    memo jsonb,
+    slot bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.create_campaign
+    ADD CONSTRAINT create_campaign_pkey PRIMARY KEY (signature);
 
 CREATE TABLE public.create_promo (
     signature text NOT NULL,
     payer text NOT NULL,
-    promo_group text NOT NULL,
+    merchant text NOT NULL,
+    campaign text NOT NULL,
     mint text NOT NULL,
     metadata text NOT NULL,
     authority text NOT NULL,
@@ -71,7 +134,9 @@ ALTER TABLE ONLY public.create_promo
 CREATE TABLE public.mint_promo_token (
     signature text NOT NULL,
     payer text NOT NULL,
-    promo_group text NOT NULL,
+    location text NOT NULL,
+    device text NOT NULL,
+    campaign text NOT NULL,
     token_owner text NOT NULL,
     mint text NOT NULL,
     authority text NOT NULL,
@@ -88,8 +153,10 @@ ALTER TABLE ONLY public.mint_promo_token
 CREATE TABLE public.delegate_promo_token (
     signature text NOT NULL,
     payer text NOT NULL,
-    delegate text NOT NULL,
-    promo_group text NOT NULL,
+    device_owner text NOT NULL,
+    location text NOT NULL,
+    device text NOT NULL,
+    campaign text NOT NULL,
     token_owner text NOT NULL,
     mint text NOT NULL,
     promo text NOT NULL,
@@ -105,7 +172,9 @@ ALTER TABLE ONLY public.delegate_promo_token
 CREATE TABLE public.burn_delegated_promo_token (
     signature text NOT NULL,
     payer text NOT NULL,
-    promo_group text NOT NULL,
+    location text NOT NULL,
+    device text NOT NULL,
+    campaign text NOT NULL,
     mint text NOT NULL,
     authority text NOT NULL,
     promo text NOT NULL,
@@ -119,6 +188,51 @@ CREATE TABLE public.burn_delegated_promo_token (
 );
 ALTER TABLE ONLY public.burn_delegated_promo_token
     ADD CONSTRAINT burn_delegated_promo_token_pkey PRIMARY KEY (signature);
+
+CREATE TABLE public.sign_memo (
+    signature text NOT NULL,
+    payer text NOT NULL,
+    signer text NOT NULL,
+    memo jsonb,
+    slot bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.sign_memo
+    ADD CONSTRAINT sign_memo_pkey PRIMARY KEY (signature);
+
+CREATE VIEW public.promo_transactions AS
+    SELECT
+        mp.signature, 'mint' as transaction_type,
+        mp.payer,
+        mp.location,
+        mp.device,
+        mp.campaign,
+        mp.mint,
+        mp.authority,
+        mp.promo,
+        mp.token_account,
+        mp.memo,
+        mp.slot,
+        mp.created_at,
+        mp.modified_at
+    FROM mint_promo_token mp
+    UNION ALL
+        SELECT
+            bdp.signature, 'burn_delegated' as transaction_type,
+            bdp.payer,
+            bdp.location,
+            bdp.device,
+            bdp.campaign,
+            bdp.mint,
+            bdp.authority,
+            bdp.promo,
+            bdp.token_account,
+            bdp.memo,
+            bdp.slot,
+            bdp.created_at,
+            bdp.modified_at
+        FROM burn_delegated_promo_token bdp;
 
 -- =============================
 -- mpl_auction_house

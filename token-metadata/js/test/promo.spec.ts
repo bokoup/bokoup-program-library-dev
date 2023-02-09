@@ -10,7 +10,6 @@ import {
   AdminSettings,
   DataV2,
   PromoExtended,
-  Campaign,
   AuctionHouseProgram,
   Merchant,
 } from '../src';
@@ -82,8 +81,6 @@ describe('promo', () => {
     new anchor.AnchorProvider(connection, new anchor.Wallet(deviceOwner), options),
   );
 
-  let campaignAccount: Campaign;
-
   it('funds accounts', async () => {
     const amount = 1_000_000_000;
     const transaction = new Transaction();
@@ -137,11 +134,12 @@ describe('promo', () => {
     const locationUri = 'https://location.example.com';
     const deviceUri = 'https://device.example.com';
     const campaignName = 'Test Campaign';
+    const campaignUri = 'https://campaign.example.com';
     const deviceName = 'Test Device';
     const lamports = 500_000_000;
     const memo = 'Created a new merchant';
 
-    let tx: string;
+    let tx: string = '';
     [tx, merchant, location, device, campaign] =
       await tokenMetadataProgramMerchantOwner.createMerchant(
         merchantData,
@@ -151,6 +149,7 @@ describe('promo', () => {
         deviceName,
         deviceUri,
         campaignName,
+        campaignUri,
         lamports,
         memo,
       );
@@ -158,7 +157,7 @@ describe('promo', () => {
     const campaignAccountInfo =
       await tokenMetadataProgram.program.provider.connection.getAccountInfo(campaign);
 
-    expect(campaignAccountInfo?.lamports).to.equal(503848880, 'Campaign lamports incorrect.');
+    expect(campaignAccountInfo?.lamports).to.equal(505240880, 'Campaign lamports incorrect.');
 
     const [merchantAccount, locationAccount, deviceAccount, campaignAccount] = await Promise.all([
       tokenMetadataProgram.program.account.merchant.fetch(merchant),

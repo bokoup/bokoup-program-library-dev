@@ -7,7 +7,7 @@ const UPSERT_QUERY: &str = include_str!("promo_upsert.sql");
 #[tracing::instrument(skip_all)]
 pub async fn upsert(client: &Client, key: &[u8], account: &Promo, slot: u64, write_version: u64) {
     let id = bs58::encode(key).into_string();
-    let owner = account.owner.to_string();
+    let campaign = account.campaign.to_string();
     let mint = account.mint.to_string();
     let metadata = account.metadata.to_string();
     let mint_count = account.mint_count as i32;
@@ -22,7 +22,7 @@ pub async fn upsert(client: &Client, key: &[u8], account: &Promo, slot: u64, wri
             UPSERT_QUERY,
             &[
                 &id,
-                &owner,
+                &campaign,
                 &mint,
                 &metadata,
                 &mint_count,
