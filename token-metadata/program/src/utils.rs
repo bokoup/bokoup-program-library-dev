@@ -7,8 +7,14 @@ use mpl_token_metadata::{pda::find_metadata_account, state::DataV2};
 
 pub const ADMIN_PREFIX: &str = "admin";
 pub const AUTHORITY_PREFIX: &str = "authority";
+pub const MERCHANT_PREFIX: &str = "merchant";
+pub const LOCATION_PREFIX: &str = "location";
+pub const DEVICE_PREFIX: &str = "device";
+pub const CAMPAIGN_PREFIX: &str = "campaign";
 pub const PROMO_PREFIX: &str = "promo";
-pub const MEMBERS_CAPACITY: u8 = 10;
+pub const LOCATIONS_CAPACITY: usize = 10;
+pub const MAX_NAME_LENGTH: usize = 64;
+pub const MAX_URI_LENGTH: usize = 200;
 
 pub fn transfer_sol<'a, 'b, 'c, 'info>(
     ctx: CpiContext<'a, 'b, 'c, 'info, TransferSol<'info>>,
@@ -121,12 +127,41 @@ pub fn find_authority_address() -> (Pubkey, u8) {
     Pubkey::find_program_address(&[AUTHORITY_PREFIX.as_bytes()], &crate::id())
 }
 
-pub fn find_promo_address(mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[PROMO_PREFIX.as_bytes(), mint.as_ref()], &crate::id())
+pub fn find_merchant_address(owner: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[MERCHANT_PREFIX.as_bytes(), owner.as_ref()], &crate::id())
 }
 
-pub fn find_group_address(seed: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(&[seed.as_ref()], &crate::id())
+pub fn find_location_address(merchant: &Pubkey, name: &str) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            LOCATION_PREFIX.as_bytes(),
+            merchant.as_ref(),
+            name.as_bytes(),
+        ],
+        &crate::id(),
+    )
+}
+
+pub fn find_device_address(location: &Pubkey, name: &str) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[DEVICE_PREFIX.as_bytes(), location.as_ref(), name.as_bytes()],
+        &crate::id(),
+    )
+}
+
+pub fn find_campaign_address(merchant: &Pubkey, name: &str) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            CAMPAIGN_PREFIX.as_bytes(),
+            merchant.as_ref(),
+            name.as_bytes(),
+        ],
+        &crate::id(),
+    )
+}
+
+pub fn find_promo_address(mint: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[PROMO_PREFIX.as_bytes(), mint.as_ref()], &crate::id())
 }
 
 pub fn find_metadata_address(mint: &Pubkey) -> (Pubkey, u8) {
@@ -139,4 +174,15 @@ pub fn find_program_data_address() -> Pubkey {
         &Pubkey::from_str("BPFLoaderUpgradeab1e11111111111111111111111").unwrap(),
     )
     .0
+}
+
+/// Pads the string to the desired size with `0u8`s.
+/// NOTE: it is assumed that the string's size is never larger than the given size.
+pub fn puffed_out_string(s: &str, size: usize) -> String {
+    let mut array_of_zeroes = vec![];
+    let puff_amount = size - s.len();
+    while array_of_zeroes.len() < puff_amount {
+        array_of_zeroes.push(0u8);
+    }
+    s.to_owned() + std::str::from_utf8(&array_of_zeroes).unwrap()
 }

@@ -11,8 +11,11 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 use borsh::BorshDeserialize;
-use state::{AdminSettings, DataV2, Promo, PromoGroup};
-use utils::{ADMIN_PREFIX, AUTHORITY_PREFIX, MEMBERS_CAPACITY, PROMO_PREFIX};
+use state::{AdminSettings, Campaign, DataV2, Device, Location, Merchant, Promo};
+use utils::{
+    ADMIN_PREFIX, AUTHORITY_PREFIX, CAMPAIGN_PREFIX, DEVICE_PREFIX, LOCATIONS_CAPACITY,
+    LOCATION_PREFIX, MAX_NAME_LENGTH, MAX_URI_LENGTH, MERCHANT_PREFIX, PROMO_PREFIX,
+};
 
 declare_id!("CjSoZrc2DBZTv1UdoMx8fTcCpqEMXCyfm2EuTwy8yiGi");
 
@@ -34,11 +37,31 @@ pub mod bpl_token_metadata {
         ctx.accounts.process(data)
     }
 
+    /// Creates Merchant account
+    pub fn create_merchant(
+        ctx: Context<CreateMerchant>,
+        merchant_data: Merchant,
+        location_data: Location,
+        device_data: Device,
+        campaign_data: Campaign,
+        lamports: u64,
+        memo: Option<String>,
+    ) -> Result<()> {
+        ctx.accounts.process(
+            merchant_data,
+            location_data,
+            device_data,
+            campaign_data,
+            lamports,
+            memo,
+        )
+    }
+
     /// Creates Group account used to grant transaction execution permissions to
     /// group members.
-    pub fn create_promo_group(
-        ctx: Context<CreatePromoGroup>,
-        data: PromoGroup,
+    pub fn create_campaign(
+        ctx: Context<CreateCampaign>,
+        data: Campaign,
         lamports: u64,
         memo: Option<String>,
     ) -> Result<()> {
@@ -61,12 +84,7 @@ pub mod bpl_token_metadata {
 
     /// Example of executing lamprts transfer from program derived account.
     pub fn transfer_cpi(ctx: Context<TransferCpi>, lamports: u64) -> Result<()> {
-        let seed = ctx.accounts.group.seed.clone();
-        let group_seeds = [seed.as_ref(), &[ctx.accounts.group.nonce]];
-
-        msg!("group_seeds: {:?}", group_seeds);
-
-        ctx.accounts.process(lamports, group_seeds)
+        ctx.accounts.process(lamports, ctx.bumps["campaign"])
     }
 
     /// Mints a promo token.
@@ -143,6 +161,59 @@ pub struct CreateAdminSettings<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Accounts related to creating [Merchant].
+///
+#[derive(Accounts, Clone)]
+#[instruction(merchant_data: Merchant, location_data: Location, device_data: Device, campaign_data: Campaign)]
+pub struct CreateMerchant<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: pubkey checked via seeds
+    #[account(
+        init,
+        constraint = merchant_data.owner == payer.key(),
+        constraint = merchant_data.name.len() <= MAX_NAME_LENGTH,
+        constraint = merchant_data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+        payer = payer,
+        space = Merchant::LEN
+    )]
+    pub merchant: Account<'info, Merchant>,
+    #[account(
+        init,
+        constraint = location_data.merchant == merchant.key(),
+        constraint = location_data.name.len() <= MAX_NAME_LENGTH,
+        constraint = location_data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [LOCATION_PREFIX.as_bytes(), merchant.key().as_ref(), location_data.name.as_bytes()], bump,
+        payer = payer,
+        space = Location::LEN
+    )]
+    pub location: Account<'info, Location>,
+    #[account(
+        init,
+        constraint = device_data.location == location.key(),
+        constraint = device_data.name.len() <= MAX_NAME_LENGTH,
+        constraint = device_data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [DEVICE_PREFIX.as_bytes(), location.key().as_ref(), device_data.name.as_bytes()], bump,
+        payer = payer,
+        space = Device::LEN
+    )]
+    pub device: Account<'info, Device>,
+    #[account(
+        init,
+        constraint = campaign_data.merchant == merchant.key(),
+        constraint = campaign_data.locations.len() <= LOCATIONS_CAPACITY as usize,
+        constraint = campaign_data.name.len() <= MAX_NAME_LENGTH,
+        seeds = [CAMPAIGN_PREFIX.as_bytes(), merchant.key().as_ref(), campaign_data.name.as_bytes()], bump,
+        payer = payer,
+        space = Campaign::LEN
+    )]
+    pub campaign: Account<'info, Campaign>,
+    pub memo_program: Program<'info, SplMemo>,
+    pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>,
+}
+
 /// Accounts related to creating a [Group].
 ///
 /// [Group] account owns [Promo] account. [Group] has an owner and members. Members can sign on behalf of the
@@ -153,23 +224,22 @@ pub struct CreateAdminSettings<'info> {
 /// [Group] has a program derived address so that permissions to it can be managed by the program. The seed is based
 /// on a public key passed in to the program.
 #[derive(Accounts)]
-#[instruction(data: PromoGroup)]
-pub struct CreatePromoGroup<'info> {
+#[instruction(data: Campaign)]
+pub struct CreateCampaign<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: pubkey checked via constraint
-    pub seed: UncheckedAccount<'info>,
+    #[account(constraint = payer.key() == merchant.owner)]
+    pub merchant: Account<'info, Merchant>,
     #[account(
         init,
-        constraint = data.members.len() <= MEMBERS_CAPACITY as usize,
-        constraint = data.owner == payer.key(),
-        constraint = data.members.contains(&data.owner),
-        constraint = data.seed == seed.key(),
-        seeds = [seed.key().as_ref()], bump,
+        constraint = data.merchant == merchant.key(),
+        constraint = data.locations.len() <= LOCATIONS_CAPACITY as usize,
+        constraint = data.name.len() <= MAX_NAME_LENGTH,
+        seeds = [CAMPAIGN_PREFIX.as_bytes(), merchant.key().as_ref(), data.name.as_bytes()], bump,
         payer = payer,
-        space = PromoGroup::LEN
+        space = Campaign::LEN
     )]
-    pub promo_group: Account<'info, PromoGroup>,
+    pub campaign: Account<'info, Campaign>,
     pub memo_program: Program<'info, SplMemo>,
     pub system_program: Program<'info, System>,
 }
@@ -199,11 +269,13 @@ pub struct CreatePromoGroup<'info> {
 pub struct CreatePromo<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut, constraint = payer.key() == merchant.owner)]
+    pub merchant: Account<'info, Merchant>,
     #[account(mut,
-        constraint = payer.key() == group.owner,
-        constraint = group.key() == promo_data.owner,
+        constraint = merchant.key() == campaign.merchant,
+        constraint = campaign.key() == promo_data.campaign,
     )]
-    pub group: Account<'info, PromoGroup>,
+    pub campaign: Account<'info, Campaign>,
     #[account(init, payer = payer, mint::decimals = 0, mint::authority = authority, mint::freeze_authority = authority)]
     pub mint: Account<'info, Mint>,
     /// CHECK: Created via cpi
@@ -215,7 +287,6 @@ pub struct CreatePromo<'info> {
     pub authority: UncheckedAccount<'info>,
     #[account(init, payer = payer,
         seeds = [PROMO_PREFIX.as_bytes(), mint.key().as_ref()], bump,
-        constraint = promo_data.owner == group.key(),
         space = Promo::LEN)]
     pub promo: Account<'info, Promo>,
     /// CHECK: pubkey checked via constraint
@@ -238,8 +309,17 @@ pub struct CreatePromo<'info> {
 pub struct TransferCpi<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(constraint = payer.key() == merchant.owner)]
+    pub merchant: Account<'info, Merchant>,
+    #[account(constraint = campaign.locations.contains(&location.key()))]
+    pub location: Account<'info, Location>,
+    #[account(
+        constraint = device.owner == payer.key(),
+        constraint = device.location == location.key(),
+    )]
+    pub device: Account<'info, Device>,
     #[account(mut)]
-    pub group: Account<'info, PromoGroup>,
+    pub campaign: Account<'info, Campaign>,
     /// CHECK: checked in contraints
     #[account(mut, constraint = platform.key() == admin_settings.platform)]
     pub platform: UncheckedAccount<'info>,
@@ -250,8 +330,8 @@ pub struct TransferCpi<'info> {
 
 /// Accounts related to minting a promo token.
 ///
-/// Requires a signature from a member of the group specified in the owner field
-/// of the promo as well as from the recipient (as a matter of responsible token issuance,
+/// Requires a signature from the owner of a device with a location included in the campaign
+/// as well as from the recipient (as a matter of responsible token issuance,
 /// bokoup always gets a recipient's consent before minting them any tokens).
 ///
 /// Creates a token account for the recipient if one does not already exist. Authority over the
@@ -264,11 +344,18 @@ pub struct TransferCpi<'info> {
 pub struct MintPromoToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut,
-        constraint = group.members.contains(&payer.key()),
-        constraint = group.key() == promo.owner,
+    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
+    pub location: Account<'info, Location>,
+    #[account(
+        constraint = device.location == location.key(),
+        constraint = device.owner == payer.key()
     )]
-    pub group: Account<'info, PromoGroup>,
+    pub device: Account<'info, Device>,
+    #[account(mut,
+        constraint = campaign.locations.contains(&location.key()),
+        constraint = campaign.key() == promo.campaign,
+    )]
+    pub campaign: Box<Account<'info, Campaign>>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
     #[account(mut)]
@@ -289,11 +376,11 @@ pub struct MintPromoToken<'info> {
 
 /// Accounts related to the delegation of a promo token.
 ///
-/// Delegates a token to the delegate.
+/// Delegates a token to a device owner.
 ///
-/// Checks to make sure delegate is a member of group specified in owner property of
-/// promo to ensure delegate will be able to sign to have the group pay platform burn
-/// fee.
+/// Requires a signature from the owner of a device with a location included in the campaign
+/// as well as from the recipient (as a matter of responsible token issuance,
+/// bokoup always gets a recipient's consent before minting them any tokens).
 ///
 /// Requires signature from token owner as the authority of the token account.
 ///
@@ -303,12 +390,19 @@ pub struct DelegatePromoToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     /// CHECK: checked via group constraints
-    pub delegate: UncheckedAccount<'info>,
-    #[account(mut,
-        constraint = group.members.contains(&delegate.key()),
-        constraint = group.key() == promo.owner,
+    pub device_owner: UncheckedAccount<'info>,
+    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
+    pub location: Account<'info, Location>,
+    #[account(
+        constraint = device.location == location.key(),
+        constraint = device.owner == device_owner.key()
     )]
-    pub group: Account<'info, PromoGroup>,
+    pub device: Account<'info, Device>,
+    #[account(mut,
+        constraint = campaign.locations.contains(&location.key()),
+        constraint = campaign.key() == promo.campaign,
+    )]
+    pub campaign: Box<Account<'info, Campaign>>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
     #[account(mut)]
@@ -339,11 +433,18 @@ pub struct DelegatePromoToken<'info> {
 pub struct BurnDelegatedPromoToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut,
-        constraint = group.members.contains(&payer.key()),
-        constraint = group.key() == promo.owner,
+    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
+    pub location: Account<'info, Location>,
+    #[account(
+        constraint = device.location == location.key(),
+        constraint = device.owner == payer.key()
     )]
-    pub group: Account<'info, PromoGroup>,
+    pub device: Box<Account<'info, Device>>,
+    #[account(mut,
+        constraint = campaign.locations.contains(&location.key()),
+        constraint = campaign.key() == promo.campaign,
+    )]
+    pub campaign: Box<Account<'info, Campaign>>,
     #[account(mut)]
     pub mint: Account<'info, Mint>,
     /// CHECK: pubkey checked via spl token program instruction

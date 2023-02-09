@@ -1,4 +1,4 @@
-use bpl_token_metadata::state::PromoGroup;
+use bpl_token_metadata::state::Campaign;
 use tokio_postgres::{types::Json, Client};
 use tracing::{error, info};
 
@@ -8,7 +8,7 @@ const UPSERT_QUERY: &str = include_str!("promo_group_upsert.sql");
 pub async fn upsert(
     client: &Client,
     key: &[u8],
-    account: &PromoGroup,
+    account: &Campaign,
     slot: u64,
     write_version: u64,
 ) {

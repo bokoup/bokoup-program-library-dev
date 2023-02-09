@@ -7,7 +7,7 @@ use anchor_client::{
     },
     Client, Cluster,
 };
-use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, PromoGroup}, utils::{self, find_group_address}};
+use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}, utils::{self, find_group_address}};
 use bundlr_sdk::{tags::Tag, Bundlr, Ed25519Signer};
 use clap::{Parser, Subcommand, ArgEnum};
 use ed25519_dalek::Keypair as DalekKeypair;
@@ -66,7 +66,7 @@ enum Commands {
         #[clap(long, default_value_t = 10_000_000, value_parser)]
         burn_promo_token_lamports: u64,
     },
-    CreateGroup {
+    CreateCampaign {
         #[clap(long, default_value_t = 500_000_000, value_parser)]
         lamports: u64,
     },
@@ -221,7 +221,7 @@ async fn main() -> anyhow::Result<()> {
             );
             Ok(())
         }
-        Commands::CreateGroup {
+        Commands::CreateCampaign {
             lamports
         } => {
             let payer = promo_owner_keypair.pubkey();
@@ -241,7 +241,7 @@ async fn main() -> anyhow::Result<()> {
                 platform_signer_keypair.pubkey()
                 ];
 
-            let data = PromoGroup {
+            let data = Campaign {
                     owner: payer,
                     seed: group_seed_keypair.pubkey(),
                     nonce,
@@ -264,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
             })
             .send()?;
             
-            let promo_group_account: PromoGroup = program.account(promo_group)?;
+            let promo_group_account: Campaign = program.account(promo_group)?;
             tracing::info!(
                 signature = tx.to_string(),
                 promo_group_account = format!("{:?}", promo_group_account)

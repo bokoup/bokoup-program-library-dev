@@ -1,22 +1,22 @@
 use crate::{
-    state::PromoGroup,
+    state::Campaign,
     utils::{create_memo, transfer_sol},
-    CreatePromoGroup, TransferSol,
+    CreateCampaign, TransferSol,
 };
 use anchor_lang::prelude::*;
 
-impl<'info> CreatePromoGroup<'info> {
-    pub fn process(&mut self, data: PromoGroup, lamports: u64, memo: Option<String>) -> Result<()> {
-        msg!("Create group");
+impl<'info> CreateCampaign<'info> {
+    pub fn process(&mut self, data: Campaign, lamports: u64, memo: Option<String>) -> Result<()> {
+        msg!("Create campaign");
 
-        *self.promo_group = data;
+        *self.campaign = data;
 
         transfer_sol(
             CpiContext::new(
                 self.system_program.to_account_info(),
                 TransferSol {
                     payer: self.payer.to_account_info(),
-                    to: self.promo_group.to_account_info(),
+                    to: self.campaign.to_account_info(),
                 },
             ),
             lamports,

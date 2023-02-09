@@ -10,8 +10,9 @@ import {
   AdminSettings,
   DataV2,
   PromoExtended,
-  PromoGroup,
+  Campaign,
   AuctionHouseProgram,
+  Merchant,
 } from '../src';
 import { PublicKey, Keypair, Transaction, Connection } from '@solana/web3.js';
 import chai = require('chai');
@@ -31,11 +32,11 @@ describe('promo', () => {
   const tokenMetadataProgram = new TokenMetadataProgram(tokenOwnerProvider);
 
   // new Uint8Array(JSON.parse(fs.readFileSync('/keys/promo_owner-keypair.json'))),
-  const promoOwner = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.PROMO_OWNER_KEYPAIR)),
+  const merchantOwner = Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(process.env.MERCHANT_OWNER_KEYPAIR)),
   );
 
-  console.log(promoOwner.publicKey);
+  console.log(merchantOwner.publicKey);
 
   const url = process.env.ANCHOR_PROVIDER_URL;
   if (url === undefined) {
@@ -43,11 +44,11 @@ describe('promo', () => {
   }
   const options = anchor.AnchorProvider.defaultOptions();
   const connection = new Connection(url, options.commitment);
-  const promoOwnerWallet = new anchor.Wallet(promoOwner);
+  const merchantOwnerWallet = new anchor.Wallet(merchantOwner);
 
-  const promoOwnerProvider = new anchor.AnchorProvider(connection, promoOwnerWallet, options);
+  const merchantOwnerProvider = new anchor.AnchorProvider(connection, merchantOwnerWallet, options);
 
-  const tokenMetadataProgramPromoOwner = new TokenMetadataProgram(promoOwnerProvider);
+  const tokenMetadataProgramMerchantOwner = new TokenMetadataProgram(merchantOwnerProvider);
 
   const platformSigner = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.PLATFORM_SIGNER_KEYPAIR)),
@@ -59,7 +60,7 @@ describe('promo', () => {
   let auctionHouse: PublicKey;
 
   const platform = Keypair.fromSecretKey(new Uint8Array(JSON.parse(process.env.PLATFORM_KEYPAIR)));
-  console.log('promoOwner: ', promoOwner.publicKey.toString());
+  console.log('merchantOwner: ', merchantOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
   console.log('platformSigner: ', platformSigner.publicKey.toString());
 
@@ -68,28 +69,28 @@ describe('promo', () => {
   let mint: PublicKey;
   let promoExtended: PromoExtended;
 
-  let group: PublicKey;
-  const groupSeed = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.GROUP_SEED_KEYPAIR)),
-  ).publicKey;
+  let merchant: PublicKey;
+  let location: PublicKey;
+  let device: PublicKey;
+  let campaign: PublicKey;
 
-  const groupMember1 = Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(process.env.GROUP_MEMBER_1_KEYPAIR)),
+  const deviceOwner = Keypair.fromSecretKey(
+    new Uint8Array(JSON.parse(process.env.DEVICE_OWNER_KEYPAIR)),
   );
 
-  const tokenMetadataProgramGroupMember1 = new TokenMetadataProgram(
-    new anchor.AnchorProvider(connection, new anchor.Wallet(groupMember1), options),
+  const tokenMetadataProgramDeviceOwner = new TokenMetadataProgram(
+    new anchor.AnchorProvider(connection, new anchor.Wallet(deviceOwner), options),
   );
 
-  let groupAccount: PromoGroup;
+  let campaignAccount: Campaign;
 
   it('funds accounts', async () => {
     const amount = 1_000_000_000;
     const transaction = new Transaction();
     const addresses = [
       platform.publicKey,
-      promoOwner.publicKey,
-      groupMember1.publicKey,
+      merchantOwner.publicKey,
+      deviceOwner.publicKey,
       platformSigner.publicKey,
     ];
     addresses.forEach((address) => {
@@ -124,44 +125,59 @@ describe('promo', () => {
     );
   });
 
-  it('creates group', async () => {
-    const members = [promoOwner.publicKey, groupMember1.publicKey, platformSigner.publicKey];
+  it('creates merchant', async () => {
+    const merchantData: Merchant = {
+      owner: merchantOwner.publicKey,
+      name: 'Test Merchant',
+      uri: 'https://merchant.example.com',
+      active: true,
+    };
+
+    const locationName = 'Test Location';
+    const locationUri = 'https://location.example.com';
+    const deviceUri = 'https://device.example.com';
+    const campaignName = 'Test Campaign';
+    const deviceName = 'Test Device';
     const lamports = 500_000_000;
-    const memo = 'Created a new group for bokoup store group';
+    const memo = 'Created a new merchant';
 
-    group = await tokenMetadataProgramPromoOwner.createPromoGroup(
-      groupSeed,
-      members,
-      lamports,
-      memo,
-    );
+    let tx: string;
+    [tx, merchant, location, device, campaign] =
+      await tokenMetadataProgramMerchantOwner.createMerchant(
+        merchantData,
+        locationName,
+        locationUri,
+        deviceOwner.publicKey,
+        deviceName,
+        deviceUri,
+        campaignName,
+        lamports,
+        memo,
+      );
 
-    groupAccount = (await tokenMetadataProgram.program.account.promoGroup.fetch(
-      group,
-    )) as PromoGroup;
-    expect(groupAccount.owner.toString()).to.equal(
-      promoOwner.publicKey.toString(),
-      'Group incorrect.',
-    );
-    console.log('accountOwner', promoOwner.publicKey.toString());
+    const campaignAccountInfo =
+      await tokenMetadataProgram.program.provider.connection.getAccountInfo(campaign);
 
-    console.log('groupAccount', groupAccount);
-    console.log('groupSeed', groupSeed);
+    expect(campaignAccountInfo?.lamports).to.equal(503848880, 'Campaign lamports incorrect.');
 
-    const groupAccountInfo = await tokenMetadataProgram.program.provider.connection.getAccountInfo(
-      group,
-    );
+    const [merchantAccount, locationAccount, deviceAccount, campaignAccount] = await Promise.all([
+      tokenMetadataProgram.program.account.merchant.fetch(merchant),
+      tokenMetadataProgram.program.account.location.fetch(location),
+      tokenMetadataProgram.program.account.device.fetch(device),
+      tokenMetadataProgram.program.account.campaign.fetch(campaign),
+    ]);
 
-    expect(groupAccountInfo?.lamports).to.equal(503626160, 'Group lamports incorrect.');
-
-    console.log('groupAccountInfo', groupAccountInfo);
+    console.log(merchantAccount, locationAccount, deviceAccount, campaignAccount);
   });
 
   it('transfers cpi', async () => {
-    tokenMetadataProgramPromoOwner.program.methods
+    tokenMetadataProgramMerchantOwner.program.methods
       .transferCpi(1_000_000)
       .accounts({
-        group,
+        merchant,
+        location,
+        device,
+        campaign,
         platform: adminSettingsAccount.platform,
         adminSettings,
       })
@@ -203,10 +219,10 @@ describe('promo', () => {
         memo: 'Created new promo',
       };
 
-      mint = await tokenMetadataProgramPromoOwner.createPromo(
+      mint = await tokenMetadataProgramMerchantOwner.createPromo(
         metadataData,
+        campaign,
         true,
-        groupSeed,
         maxMint,
         maxRedeem,
         adminSettingsAccount.platform,
@@ -234,7 +250,7 @@ describe('promo', () => {
   // of their membership in the group that owns the promo.
   it('Mints a promo token', async () => {
     const [tokenAccountAccount, mintAccount] = await tokenMetadataProgram
-      .mintPromoToken(mint, groupMember1, groupSeed, 'just a string for a memo')
+      .mintPromoToken(mint, deviceOwner, location, device, campaign, 'just a string for a memo')
       .then((tokenAccount) =>
         Promise.all([
           tokenMetadataProgram.getTokenAccount(tokenAccount),
@@ -261,7 +277,14 @@ describe('promo', () => {
     };
 
     const tokenAccountAccount = await tokenMetadataProgram
-      .delegatePromoToken(mint, groupMember1.publicKey, groupSeed, JSON.stringify(memo))
+      .delegatePromoToken(
+        mint,
+        deviceOwner.publicKey,
+        location,
+        device,
+        campaign,
+        JSON.stringify(memo),
+      )
       .then((tokenAccount) => tokenMetadataProgram.getTokenAccount(tokenAccount));
     expect(Number(tokenAccountAccount.delegatedAmount)).to.equal(1, 'Delegated amount incorrect.');
     console.log('tokenAccountAccount: ', tokenAccountAccount);
@@ -273,17 +296,22 @@ describe('promo', () => {
         adminSettingsAccount.platform,
       );
 
+    const campaignStartAccountInfo =
+      await tokenMetadataProgram.program.provider.connection.getAccountInfo(campaign);
+
     console.log('mint', mint);
     const memo = {
       reference: 'myReference',
       memo: 'burned delegated token',
     };
 
-    await tokenMetadataProgramGroupMember1.burnDelegatedPromoToken(
+    await tokenMetadataProgramDeviceOwner.burnDelegatedPromoToken(
       mint,
+      location,
+      device,
+      campaign,
       tokenOwner,
       platform.publicKey,
-      groupSeed,
       JSON.stringify(memo),
     );
 
@@ -301,17 +329,30 @@ describe('promo', () => {
       await tokenMetadataProgram.program.provider.connection.getAccountInfo(
         adminSettingsAccount.platform,
       );
-    if (platformStartAccountInfo !== null && platformAccountInfo !== null) {
+
+    const campaignAccountInfo =
+      await tokenMetadataProgram.program.provider.connection.getAccountInfo(campaign);
+
+    if (
+      platformStartAccountInfo !== null &&
+      platformAccountInfo !== null &&
+      campaignStartAccountInfo !== null &&
+      campaignAccountInfo !== null
+    ) {
       expect(platformAccountInfo.lamports).to.equal(
         platformStartAccountInfo.lamports + adminSettingsAccount.burnPromoTokenLamports.toNumber(),
-        'Platform lamports incorrect.',
+        'Campaign lamports incorrect.',
+      );
+      expect(campaignAccountInfo.lamports).to.equal(
+        campaignStartAccountInfo.lamports - adminSettingsAccount.burnPromoTokenLamports.toNumber(),
+        'Campaign lamports incorrect.',
       );
     }
   });
 
   it('Signs a memo', async () => {
     const memo = 'hello';
-    const tx = await tokenMetadataProgram.signMemo(memo, promoOwner);
+    const tx = await tokenMetadataProgram.signMemo(memo, merchantOwner);
     console.log(tx);
   });
 
@@ -326,7 +367,7 @@ describe('promo', () => {
     const tokenSize = 1;
 
     await tokenMetadataProgram
-      .mintPromoToken(mint, groupMember1, groupSeed, 'just a string for a memo')
+      .mintPromoToken(mint, deviceOwner, location, device, campaign, 'just a string for a memo')
       .then((tokenAccount) =>
         Promise.all([
           tokenMetadataProgram.getTokenAccount(tokenAccount),
@@ -461,13 +502,13 @@ describe('promo', () => {
       uses: null,
     };
 
-    const [tx, mint, metadata, edition] = await tokenMetadataProgramPromoOwner.createNonFungible(
+    const [tx, mint, metadata, edition] = await tokenMetadataProgramMerchantOwner.createNonFungible(
       metadataData2,
-      promoOwner,
+      merchantOwner,
     );
     const [metadataAccount, editionAccount] = await Promise.all([
-      tokenMetadataProgramPromoOwner.getMetadataAccount(metadata),
-      tokenMetadataProgramPromoOwner.getMasterEditionAccount(edition),
+      tokenMetadataProgramMerchantOwner.getMetadataAccount(metadata),
+      tokenMetadataProgramMerchantOwner.getMasterEditionAccount(edition),
     ]);
     console.log(metadataAccount, editionAccount);
   });

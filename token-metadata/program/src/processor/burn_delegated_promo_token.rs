@@ -1,5 +1,5 @@
-use crate::utils::{create_memo, transfer_sol};
-use crate::{error::ProgramError, BurnDelegatedPromoToken, TransferSol};
+use crate::utils::create_memo;
+use crate::{error::ProgramError, BurnDelegatedPromoToken};
 use anchor_lang::prelude::*;
 
 impl<'info> BurnDelegatedPromoToken<'info> {
@@ -14,18 +14,17 @@ impl<'info> BurnDelegatedPromoToken<'info> {
         }
 
         if self.admin_settings.burn_promo_token_lamports > 0 {
-            transfer_sol(
-                CpiContext::new(
-                    self.system_program.to_account_info(),
-                    TransferSol {
-                        payer: self.payer.to_account_info(),
-                        to: self.platform.to_account_info(),
-                    },
-                ),
-                self.admin_settings.burn_promo_token_lamports,
-            )?;
+            let campaign = self.campaign.to_account_info();
+            let platform = self.platform.to_account_info();
+            let amount = self.admin_settings.burn_promo_token_lamports;
+
+            **campaign.try_borrow_mut_lamports()? =
+                campaign.lamports().checked_sub(amount).unwrap();
+            **platform.try_borrow_mut_lamports()? =
+                platform.lamports().checked_add(amount).unwrap();
         }
 
+        // device owner is the payer
         let burn_ctx = anchor_spl::token::Burn {
             mint: self.mint.to_account_info(),
             from: self.token_account.to_account_info(),

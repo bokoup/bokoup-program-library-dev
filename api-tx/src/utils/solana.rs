@@ -21,7 +21,7 @@ use bpl_token_metadata::{
         DelegatePromoToken as delegate_promo_token_instruction,
         MintPromoToken as mint_promo_token_instruction, SignMemo as sign_memo_instruction,
     },
-    state::{DataV2, Promo, PromoGroup},
+    state::{Campaign, DataV2, Promo},
     utils::{
         find_admin_address, find_associated_token_address, find_authority_address,
         find_group_address, find_metadata_address, find_promo_address,
@@ -46,7 +46,7 @@ pub fn create_create_promo_group_instruction(
 
     let (promo_group, nonce) = find_group_address(&group_seed);
 
-    let data = PromoGroup {
+    let data = Campaign {
         owner: payer,
         seed: group_seed,
         nonce,

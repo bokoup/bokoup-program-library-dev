@@ -63,7 +63,7 @@ mod tests {
     use super::*;
     use anchor_spl::associated_token::get_associated_token_address;
     use bpl_token_metadata::{
-        state::{Promo, PromoGroup},
+        state::{Campaign, Promo},
         utils::find_group_address,
     };
     use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -102,7 +102,7 @@ mod tests {
     async fn it_upserts_promo_group(
         client: &Client,
         key: &[u8],
-        account: &PromoGroup,
+        account: &Campaign,
         slot: u64,
         write_version: u64,
     ) {
@@ -389,10 +389,8 @@ mod tests {
             )
             .await;
         } else if table == "sign_memo" {
-            queries::bpl_token_metadata::sign_memo::upsert(
-                client, signature, accounts, data, slot,
-            )
-            .await;
+            queries::bpl_token_metadata::sign_memo::upsert(client, signature, accounts, data, slot)
+                .await;
         }
 
         let row = client
@@ -456,7 +454,7 @@ mod tests {
         let seed = Pubkey::new_unique();
         let (group_pubkey, nonce) = find_group_address(&seed);
 
-        let group = PromoGroup {
+        let group = Campaign {
             owner,
             seed,
             nonce,

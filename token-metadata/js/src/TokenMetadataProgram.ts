@@ -20,7 +20,10 @@ import {
   MetadataJson,
   AdminSettings,
   PromoExtendeds,
-  PromoGroup,
+  Campaign,
+  Device,
+  Location,
+  Merchant,
 } from '.';
 const camelcaseKeysDeep = require('camelcase-keys-deep');
 
@@ -34,9 +37,13 @@ export class TokenMetadataProgram {
 
   readonly ADMIN_PREFIX: string;
   readonly AUTHORITY_PREFIX: string;
+  readonly MERCHANT_PREFIX: string;
+  readonly LOCATION_PREFIX: string;
+  readonly DEVICE_PREFIX: string;
+  readonly CAMPAIGN_PREFIX: string;
+  readonly PROMO_PREFIX: string;
   readonly METADATA_PREFIX: string;
   readonly EDITION_PREFIX: string;
-  readonly PROMO_PREFIX: string;
 
   program: Program;
   payer: Wallet;
@@ -52,9 +59,13 @@ export class TokenMetadataProgram {
 
     this.ADMIN_PREFIX = 'admin';
     this.AUTHORITY_PREFIX = 'authority';
+    this.MERCHANT_PREFIX = 'merchant';
+    this.LOCATION_PREFIX = 'location';
+    this.DEVICE_PREFIX = 'device';
+    this.CAMPAIGN_PREFIX = 'campaign';
+    this.PROMO_PREFIX = 'promo';
     this.METADATA_PREFIX = 'metadata';
     this.EDITION_PREFIX = 'edition';
-    this.PROMO_PREFIX = 'promo';
 
     this.program = new Program(idl as Idl, this.PUBKEY, provider);
     const anchorProvider = this.program.provider as AnchorProvider;
@@ -96,31 +107,84 @@ export class TokenMetadataProgram {
     return adminSettings;
   }
 
-  async createPromoGroup(
-    seed: PublicKey,
-    members: Array<PublicKey>,
+  async createMerchant(
+    merchantData: Merchant,
+    locationName: string,
+    locationUri: string,
+    deviceOwner: PublicKey,
+    deviceName: string,
+    deviceUri: string,
+    campaignName: string,
     lamports: number,
     memo: string | null,
-  ): Promise<PublicKey> {
-    const group = this.findPromoGroupAddress(seed);
+  ): Promise<[string, PublicKey, PublicKey, PublicKey, PublicKey]> {
+    const merchant = this.findMerchantAddress(merchantData.owner);
+    const location = this.findLocationAddress(merchant, locationName);
+    const device = this.findDeviceAddress(location, deviceName);
+    const campaign = this.findCampaignAddress(merchant, campaignName);
 
-    const groupData: PromoGroup = {
-      owner: this.payer.publicKey,
-      seed,
-      nonce: 0,
-      members,
+    const locationData: Location = {
+      merchant,
+      name: locationName,
+      uri: locationUri,
+      active: true,
     };
 
-    await this.program.methods
-      .createPromoGroup(groupData, new BN(lamports), memo)
+    const deviceData: Device = {
+      owner: deviceOwner,
+      location,
+      name: deviceName,
+      uri: deviceUri,
+      active: true,
+    };
+
+    const campaignData: Campaign = {
+      merchant,
+      name: campaignName,
+      locations: [location],
+      active: true,
+    };
+
+    const tx = await this.program.methods
+      .createMerchant(merchantData, locationData, deviceData, campaignData, new BN(lamports), memo)
       .accounts({
-        group,
-        seed,
+        merchant,
+        location,
+        device,
+        campaign,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
       .rpc();
-    console.log('jingus', group);
-    return group;
+
+    return [tx, merchant, location, device, campaign];
+  }
+
+  async createCampaign(
+    name: string,
+    locations: Array<PublicKey>,
+    active: boolean,
+    lamports: number,
+    memo: string | null,
+  ): Promise<PublicKey> {
+    const merchant = this.findMerchantAddress(this.payer.publicKey);
+    const campaign = this.findCampaignAddress(merchant, name);
+
+    const campaignData: Campaign = {
+      merchant,
+      name,
+      locations,
+      active,
+    };
+
+    await this.program.methods
+      .createCampaign(campaignData, new BN(lamports), memo)
+      .accounts({
+        merchant,
+        campaign,
+        memoProgram: this.MEMO_PROGRAM_ID,
+      })
+      .rpc();
+    return campaign;
   }
 
   /**
@@ -150,8 +214,8 @@ export class TokenMetadataProgram {
    */
   async createPromo(
     metadataData: DataV2,
+    campaign: PublicKey,
     isMutable: boolean,
-    groupSeed: PublicKey,
     maxMint: number | null,
     maxBurn: number | null,
     platform: PublicKey,
@@ -160,10 +224,10 @@ export class TokenMetadataProgram {
     const mint = Keypair.generate();
 
     const metadata = this.findMetadataAddress(mint.publicKey);
-    const group = this.findPromoGroupAddress(groupSeed);
+    const merchant = this.findMerchantAddress(this.payer.publicKey);
 
     const promoData: Promo = {
-      owner: group,
+      campaign,
       mint: mint.publicKey,
       metadata,
       mintCount: 0,
@@ -175,7 +239,8 @@ export class TokenMetadataProgram {
     await this.program.methods
       .createPromo(promoData, metadataData, isMutable, memo)
       .accounts({
-        group,
+        merchant,
+        campaign,
         mint: mint.publicKey,
         metadata,
         platform,
@@ -191,33 +256,34 @@ export class TokenMetadataProgram {
   /**
    * Mint promo token
    *
-   * @param mint       Promo mint
-   * @param platform   Address of platform account
-   * @param promoOwner Keypair of promo owner
+   * @param mint        Promo mint
+   * @param deviceOwner Keypair of device owner
    *
-   * @return Address of promo account
+   * @return Address of token account account
    */
-  // no promo owner as signer for demo
   async mintPromoToken(
     mint: PublicKey,
-    groupMember: Keypair,
-    groupSeed: PublicKey,
+    deviceOwner: Keypair,
+    location: PublicKey,
+    device: PublicKey,
+    campaign: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
     const tokenAccount = this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
-    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .mintPromoToken(memo)
       .accounts({
-        payer: groupMember.publicKey,
-        group,
+        payer: deviceOwner.publicKey,
+        location,
+        device,
+        campaign,
         tokenOwner: this.payer.publicKey,
         mint,
         tokenAccount,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
-      .signers([groupMember])
+      .signers([deviceOwner, this.payer.payer])
       .rpc();
 
     return tokenAccount;
@@ -232,18 +298,21 @@ export class TokenMetadataProgram {
    */
   async delegatePromoToken(
     mint: PublicKey,
-    delegate: PublicKey,
-    groupSeed: PublicKey,
+    deviceOwner: PublicKey,
+    location: PublicKey,
+    device: PublicKey,
+    campaign: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
     const tokenAccount = this.findAssociatedTokenAccountAddress(mint, this.payer.publicKey);
-    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .delegatePromoToken(memo)
       .accounts({
-        delegate,
-        group,
+        deviceOwner,
+        location,
+        device,
+        campaign,
         tokenOwner: this.payer.publicKey,
         mint,
         tokenAccount,
@@ -265,18 +334,21 @@ export class TokenMetadataProgram {
   // no promo owner as signer for demo
   async burnDelegatedPromoToken(
     mint: PublicKey,
+    location: PublicKey,
+    device: PublicKey,
+    campaign: PublicKey,
     tokenOwner: PublicKey,
     platform: PublicKey,
-    groupSeed: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
     const tokenAccount = this.findAssociatedTokenAccountAddress(mint, tokenOwner);
-    const group = this.findPromoGroupAddress(groupSeed);
 
     await this.program.methods
       .burnDelegatedPromoToken(memo)
       .accounts({
-        group,
+        location,
+        device,
+        campaign,
         mint,
         platform,
         tokenAccount,
@@ -434,6 +506,34 @@ export class TokenMetadataProgram {
     return PublicKey.findProgramAddressSync([Buffer.from(this.AUTHORITY_PREFIX)], this.PUBKEY)[0];
   }
 
+  findMerchantAddress(owner: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.MERCHANT_PREFIX), owner.toBuffer()],
+      this.PUBKEY,
+    )[0];
+  }
+
+  findLocationAddress(merchant: PublicKey, name: string): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.LOCATION_PREFIX), merchant.toBuffer(), Buffer.from(name)],
+      this.PUBKEY,
+    )[0];
+  }
+
+  findDeviceAddress(location: PublicKey, name: string): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.DEVICE_PREFIX), location.toBuffer(), Buffer.from(name)],
+      this.PUBKEY,
+    )[0];
+  }
+
+  findCampaignAddress(merchant: PublicKey, name: string): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.CAMPAIGN_PREFIX), merchant.toBuffer(), Buffer.from(name)],
+      this.PUBKEY,
+    )[0];
+  }
+
   findMetadataAddress(mint: PublicKey): PublicKey {
     return PublicKey.findProgramAddressSync(
       [
@@ -489,10 +589,6 @@ export class TokenMetadataProgram {
     )[0];
   }
 
-  findPromoGroupAddress(groupSeed: PublicKey): PublicKey {
-    return PublicKey.findProgramAddressSync([groupSeed.toBuffer()], this.PUBKEY)[0];
-  }
-
   findProgramDataAdress(): PublicKey {
     return PublicKey.findProgramAddressSync(
       [this.PUBKEY.toBytes()],
@@ -502,7 +598,7 @@ export class TokenMetadataProgram {
 }
 
 export class PromoExtendedImpl implements PromoExtended {
-  owner: PublicKey;
+  campaign: PublicKey;
   mint: PublicKey;
   metadata: PublicKey;
   mintCount: number;
@@ -522,7 +618,7 @@ export class PromoExtendedImpl implements PromoExtended {
     metadataAccount: Metadata,
     metadataJson: MetadataJson,
   ) {
-    this.owner = promoAccount.owner;
+    this.campaign = promoAccount.campaign;
     this.publicKey = promo;
     this.mint = mintAccount.address;
     this.metadata = metadata;

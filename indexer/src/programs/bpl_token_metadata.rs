@@ -8,7 +8,7 @@ use bpl_api_data::{
     Client,
 };
 pub use bpl_token_metadata::{
-    state::{Promo, PromoGroup},
+    state::{Campaign, Promo},
     ID,
 };
 
@@ -36,7 +36,7 @@ async fn process_promo_group<'a>(
     slot: u64,
     write_version: u64,
 ) {
-    match PromoGroup::try_deserialize(buf) {
+    match Campaign::try_deserialize(buf) {
         Ok(ref account) => promo_group::upsert(pg_client, key, account, slot, write_version).await,
         Err(error) => {
             tracing::error!(id = bs58::encode(key).into_string(), ?error)
@@ -52,9 +52,7 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
 
     match buf.len() {
         Promo::LEN => process_promo(&pg_client, key, &mut buf, slot, write_version).await,
-        PromoGroup::LEN => {
-            process_promo_group(&pg_client, key, &mut buf, slot, write_version).await
-        }
+        Campaign::LEN => process_promo_group(&pg_client, key, &mut buf, slot, write_version).await,
         _ => (),
     }
 }

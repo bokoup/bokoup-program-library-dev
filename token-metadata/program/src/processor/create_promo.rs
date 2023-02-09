@@ -17,18 +17,19 @@ impl<'info> CreatePromo<'info> {
         msg!("Create promo");
 
         // Error if not enough lamports
-        if self.group.to_account_info().lamports.borrow().clone()
+        if self.campaign.to_account_info().lamports.borrow().clone()
             < self.admin_settings.create_promo_lamports
         {
             return Err(ProgramError::InsufficientFunds.into());
         }
 
         if self.admin_settings.create_promo_lamports > 0 {
-            let group = self.group.to_account_info();
+            let campaign = self.campaign.to_account_info();
             let platform = self.platform.to_account_info();
             let amount = self.admin_settings.create_promo_lamports;
 
-            **group.try_borrow_mut_lamports()? = group.lamports().checked_sub(amount).unwrap();
+            **campaign.try_borrow_mut_lamports()? =
+                campaign.lamports().checked_sub(amount).unwrap();
             **platform.try_borrow_mut_lamports()? =
                 platform.lamports().checked_add(amount).unwrap();
         }

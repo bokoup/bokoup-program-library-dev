@@ -16,11 +16,33 @@ export type AdminSettings = {
   burnPromoTokenLamports: BN;
 };
 
-export type PromoGroup = {
+export type Merchant = {
   owner: PublicKey;
-  seed: PublicKey;
-  nonce: number;
-  members: Array<PublicKey>;
+  name: String;
+  uri: String;
+  active: boolean;
+};
+
+export type Location = {
+  merchant: PublicKey;
+  name: String;
+  uri: String;
+  active: boolean;
+};
+
+export type Device = {
+  owner: PublicKey;
+  location: PublicKey;
+  name: String;
+  uri: String;
+  active: boolean;
+};
+
+export type Campaign = {
+  merchant: PublicKey;
+  name: String;
+  locations: Array<PublicKey>;
+  active: boolean;
 };
 
 export type UI<T> = T & {
@@ -28,7 +50,7 @@ export type UI<T> = T & {
 };
 
 export type Promo = {
-  owner: PublicKey;
+  campaign: PublicKey;
   mint: PublicKey;
   metadata: PublicKey;
   mintCount: number;

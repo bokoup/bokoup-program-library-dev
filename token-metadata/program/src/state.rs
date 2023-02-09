@@ -4,7 +4,7 @@ use mpl_token_metadata::state::{
     UseMethod as UseMethodMpl, Uses as UsesMpl,
 };
 
-use crate::utils::MEMBERS_CAPACITY;
+use crate::utils::{LOCATIONS_CAPACITY, MAX_NAME_LENGTH, MAX_URI_LENGTH};
 
 //==============================
 // AdminSettings
@@ -27,20 +27,91 @@ impl AdminSettings {
 }
 
 //==============================
-// Group
+// Merchant
+//==============================
+
+#[account]
+#[derive(PartialEq, Debug)]
+pub struct Merchant {
+    pub owner: Pubkey,
+    pub name: String,
+    pub uri: String,
+    pub active: bool,
+}
+
+impl Merchant {
+    pub const LEN: usize = 8
+    + 32                // owner
+    + MAX_NAME_LENGTH   // name
+    + MAX_URI_LENGTH    // uri
+    + 1; // active
+}
+
+//==============================
+// Location
+//==============================
+
+// name must be unique: address is is pda of merchant address and name string
+// going to include physical address in metadata
+// can also include reference, i.e. location number in metadata
+#[account]
+#[derive(PartialEq, Debug)]
+pub struct Location {
+    pub merchant: Pubkey,
+    pub name: String,
+    pub uri: String,
+    pub active: bool,
+}
+
+impl Location {
+    pub const LEN: usize = 8
+    + 32                // merchant
+    + MAX_NAME_LENGTH   // name
+    + MAX_URI_LENGTH    // uri
+    + 1; // active
+}
+
+//==============================
+// Device
+//==============================
+
+// name must be unique: address is is pda of merchant address and name string
+// going to include physical address in metadata
+// can also include reference, i.e. location number in metadata
+#[account]
+#[derive(PartialEq, Debug)]
+pub struct Device {
+    pub owner: Pubkey,
+    pub location: Pubkey,
+    pub name: String,
+    pub uri: String,
+    pub active: bool,
+}
+
+impl Device {
+    pub const LEN: usize = 8
+    + 32                // owner
+    + 32                // location
+    + MAX_NAME_LENGTH   // name
+    + MAX_URI_LENGTH    // uri
+    + 1; // active
+}
+
+//==============================
+// PromoGroup
 //==============================
 
 #[account]
 #[derive(Default, Debug)]
-pub struct PromoGroup {
-    pub owner: Pubkey,
-    pub seed: Pubkey,
-    pub nonce: u8,
-    pub members: Vec<Pubkey>,
+pub struct Campaign {
+    pub merchant: Pubkey,
+    pub name: String,
+    pub locations: Vec<Pubkey>,
+    pub active: bool,
 }
 
-impl PromoGroup {
-    pub const LEN: usize = 8 + 32 + 32 + 1 + 32 * MEMBERS_CAPACITY as usize;
+impl Campaign {
+    pub const LEN: usize = 8 + 32 + MAX_NAME_LENGTH + 32 * LOCATIONS_CAPACITY + 1;
 }
 
 //==============================
@@ -52,7 +123,7 @@ impl PromoGroup {
 #[account]
 #[derive(PartialEq, Debug, Copy)]
 pub struct Promo {
-    pub owner: Pubkey,
+    pub campaign: Pubkey,
     pub mint: Pubkey,
     pub metadata: Pubkey,
     pub mint_count: u32,
