@@ -62,7 +62,7 @@ pub async fn apply_migrations(client: &mut Client) -> Result<(), Error> {
 mod tests {
     use super::*;
     use anchor_spl::associated_token::get_associated_token_address;
-    use bpl_token_metadata::state::{Campaign, Merchant, Promo};
+    use bpl_token_metadata::state::{Campaign, Device, Location, Merchant, Promo};
     use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
     use mpl_auction_house::{
         pda::{
@@ -121,6 +121,62 @@ mod tests {
             row.get::<&str, String>("owner"),
             account.owner.to_string(),
             "it_upserts_merchant: owner failed"
+        );
+    }
+
+    async fn it_upserts_location(
+        client: &Client,
+        key: &[u8],
+        account: &Location,
+        slot: u64,
+        write_version: u64,
+    ) {
+        queries::bpl_token_metadata::location::upsert(client, key, account, slot, write_version)
+            .await;
+        let row = client
+            .query_one(
+                "SELECT * FROM location WHERE id = $1",
+                &[&bs58::encode(key).into_string()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.get::<&str, String>("name"),
+            account.name,
+            "it_upserts_location: name failed"
+        );
+        assert_eq!(
+            row.get::<&str, String>("merchant"),
+            account.merchant.to_string(),
+            "it_upserts_location: merchant failed"
+        );
+    }
+
+    async fn it_upserts_device(
+        client: &Client,
+        key: &[u8],
+        account: &Device,
+        slot: u64,
+        write_version: u64,
+    ) {
+        queries::bpl_token_metadata::device::upsert(client, key, account, slot, write_version)
+            .await;
+        let row = client
+            .query_one(
+                "SELECT * FROM device WHERE id = $1",
+                &[&bs58::encode(key).into_string()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.get::<&str, String>("name"),
+            account.name,
+            "it_upserts_device: name failed"
+        );
+        assert_eq!(
+            row.get::<&str, String>("location"),
+            account.location.to_string(),
+            "it_upserts_device: location failed"
         );
     }
 
@@ -413,6 +469,11 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
+        } else if table == "create_location" {
+            queries::bpl_token_metadata::create_location::upsert(
+                client, signature, accounts, data, slot,
+            )
+            .await;
         } else if table == "sign_memo" {
             queries::bpl_token_metadata::sign_memo::upsert(client, signature, accounts, data, slot)
                 .await;
@@ -463,6 +524,7 @@ mod tests {
         let accounts: Vec<Pubkey> = (0..12).map(|_| Pubkey::new_unique()).collect();
 
         for table in vec![
+            "create_location",
             "create_campaign",
             "create_promo",
             "mint_promo_token",
@@ -474,16 +536,37 @@ mod tests {
         }
 
         // upsert merchant
-        let owner = Pubkey::new_unique();
 
-        let campaign = Merchant {
-            owner,
+        let merchant = Merchant {
+            owner: Pubkey::new_unique(),
             name: "Test Merchant".to_string(),
             uri: "https://arweave.net/u27CJpMzXZnmrTwqXzHjXQnECxP0_iMzSjE-WMAec24".to_string(),
             active: true,
         };
 
-        it_upserts_merchant(&client, Pubkey::new_unique().as_ref(), &campaign, 42, 1).await;
+        it_upserts_merchant(&client, Pubkey::new_unique().as_ref(), &merchant, 42, 1).await;
+
+        // upsert location
+        let location = Location {
+            merchant: Pubkey::new_unique(),
+            name: "Test Location".to_string(),
+            uri: "https://arweave.net/u27CJpMzXZnmrTwqXzHjXQnECxP0_iMzSjE-WMAec24".to_string(),
+            active: true,
+        };
+
+        it_upserts_location(&client, Pubkey::new_unique().as_ref(), &location, 42, 1).await;
+
+        // upsert device
+
+        let device = Device {
+            owner: Pubkey::new_unique(),
+            location: Pubkey::new_unique(),
+            name: "Test Device".to_string(),
+            uri: "https://arweave.net/u27CJpMzXZnmrTwqXzHjXQnECxP0_iMzSjE-WMAec24".to_string(),
+            active: true,
+        };
+
+        it_upserts_device(&client, Pubkey::new_unique().as_ref(), &device, 42, 1).await;
 
         // upsert campaign
         let merchant = Pubkey::new_unique();

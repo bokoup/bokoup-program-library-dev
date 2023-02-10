@@ -169,6 +169,22 @@ describe('promo', () => {
     console.log(merchantAccount, locationAccount, deviceAccount, campaignAccount);
   });
 
+  it('creates location', async () => {
+    const locationName = 'Test Location 2';
+    const locationUri = 'https://location.example.com';
+    const memo = 'Created a new location';
+
+    const [_, location2] = await tokenMetadataProgramMerchantOwner.createLocation(
+      locationName,
+      locationUri,
+      memo,
+    );
+
+    const locationAccount = await tokenMetadataProgram.program.account.location.fetch(location2);
+
+    expect(locationAccount.name).to.equal(locationName);
+  });
+
   it('transfers cpi', async () => {
     tokenMetadataProgramMerchantOwner.program.methods
       .transferCpi(1_000_000)

@@ -25,6 +25,7 @@ CREATE TABLE public.location (
     merchant text NOT NULL,
     name text NOT NULL,
     uri text NOT NULL,
+    metadata_json jsonb,
     active boolean NOT NULL,
     slot bigint NOT NULL,
     write_version bigint NOT NULL,
@@ -40,6 +41,7 @@ CREATE TABLE public.device (
     location text NOT NULL,
     name text NOT NULL,
     uri text NOT NULL,
+    metadata_json jsonb,
     active boolean NOT NULL,
     slot bigint NOT NULL,
     write_version bigint NOT NULL,
@@ -97,6 +99,19 @@ CREATE TABLE public.create_merchant (
 );
 ALTER TABLE ONLY public.create_merchant
     ADD CONSTRAINT create_merchant_pkey PRIMARY KEY (signature);
+
+CREATE TABLE public.create_location (
+    signature text NOT NULL,
+    payer text NOT NULL,
+    merchant text NOT NULL,
+    location text NOT NULL,
+    memo jsonb,
+    slot bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.create_location
+    ADD CONSTRAINT create_location_pkey PRIMARY KEY (signature);
 
 CREATE TABLE public.create_campaign (
     signature text NOT NULL,

@@ -2,8 +2,8 @@ use crate::{AccountMessageData, TransactionMessageData};
 use anchor_lang::AccountDeserialize;
 use bpl_api_data::{
     queries::bpl_token_metadata::{
-        burn_delegated_promo_token, create_promo, create_promo_group, delegate_promo_token,
-        mint_promo_token, promo, promo_group, sign_memo,
+        burn_delegated_promo_token, campaign, create_campaign, create_promo, delegate_promo_token,
+        mint_promo_token, promo, sign_memo,
     },
     Client,
 };
@@ -37,7 +37,7 @@ async fn process_promo_group<'a>(
     write_version: u64,
 ) {
     match Campaign::try_deserialize(buf) {
-        Ok(ref account) => promo_group::upsert(pg_client, key, account, slot, write_version).await,
+        Ok(ref account) => campaign::upsert(pg_client, key, account, slot, write_version).await,
         Err(error) => {
             tracing::error!(id = bs58::encode(key).into_string(), ?error)
         }
@@ -78,7 +78,7 @@ pub async fn process_transaction<'a>(
 
     match discriminator {
         Discriminator::CREATE_PROMO_GROUP => {
-            create_promo_group::upsert(
+            create_campaign::upsert(
                 &pg_client,
                 &message.signature,
                 &message.accounts,

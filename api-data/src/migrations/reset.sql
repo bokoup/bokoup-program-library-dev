@@ -10,6 +10,7 @@ DROP TABLE IF EXISTS public.campaign CASCADE;
 DROP TABLE IF EXISTS public.create_campaign CASCADE;
 DROP TABLE IF EXISTS public.create_device CASCADE;
 DROP TABLE IF EXISTS public.create_location CASCADE;
+DROP TABLE IF EXISTS public.create_location CASCADE;
 DROP TABLE IF EXISTS public.create_merchant CASCADE;
 DROP TABLE IF EXISTS public.create_promo CASCADE;
 DROP TABLE IF EXISTS public.create_promo_group CASCADE;

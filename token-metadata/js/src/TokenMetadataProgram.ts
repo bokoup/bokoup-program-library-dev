@@ -161,6 +161,33 @@ export class TokenMetadataProgram {
     return [tx, merchant, location, device, campaign];
   }
 
+  async createLocation(
+    locationName: string,
+    locationUri: string,
+    memo: string | null,
+  ): Promise<[string, PublicKey]> {
+    const merchant = this.findMerchantAddress(this.payer.publicKey);
+    const location = this.findLocationAddress(merchant, locationName);
+
+    const locationData: Location = {
+      merchant,
+      name: locationName,
+      uri: locationUri,
+      active: true,
+    };
+
+    const tx = await this.program.methods
+      .createLocation(locationData, memo)
+      .accounts({
+        merchant,
+        location,
+        memoProgram: this.MEMO_PROGRAM_ID,
+      })
+      .rpc();
+
+    return [tx, location];
+  }
+
   async createCampaign(
     name: string,
     uri: String,

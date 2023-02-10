@@ -57,6 +57,15 @@ pub mod bpl_token_metadata {
         )
     }
 
+    /// Creates Location account
+    pub fn create_location(
+        ctx: Context<CreateLocation>,
+        location_data: Location,
+        memo: Option<String>,
+    ) -> Result<()> {
+        ctx.accounts.process(location_data, memo)
+    }
+
     /// Creates Group account used to grant transaction execution permissions to
     /// group members.
     pub fn create_campaign(
@@ -207,6 +216,34 @@ pub struct CreateMerchant<'info> {
         space = Campaign::LEN
     )]
     pub campaign: Account<'info, Campaign>,
+    pub memo_program: Program<'info, SplMemo>,
+    pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts related to creating [Merchant].
+///
+#[derive(Accounts, Clone)]
+#[instruction(location_data: Location)]
+pub struct CreateLocation<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: pubkey checked via seeds
+    #[account(
+        constraint = merchant.owner == payer.key(),
+        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+    )]
+    pub merchant: Account<'info, Merchant>,
+    #[account(
+        init,
+        constraint = location_data.merchant == merchant.key(),
+        constraint = location_data.name.len() <= MAX_NAME_LENGTH,
+        constraint = location_data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [LOCATION_PREFIX.as_bytes(), merchant.key().as_ref(), location_data.name.as_bytes()], bump,
+        payer = payer,
+        space = Location::LEN
+    )]
+    pub location: Account<'info, Location>,
     pub memo_program: Program<'info, SplMemo>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
