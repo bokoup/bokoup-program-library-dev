@@ -7,7 +7,7 @@ use anchor_client::{
     },
     Client, Cluster,
 };
-use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}, utils::{self, find_group_address}};
+use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}, utils::{self, find_campaign_address, find_merchant_address}};
 use bundlr_sdk::{tags::Tag, Bundlr, Ed25519Signer};
 use clap::{Parser, Subcommand, ArgEnum};
 use ed25519_dalek::Keypair as DalekKeypair;
@@ -20,10 +20,9 @@ enum Address {
     ProgramAuthority,
     Platform,
     PlatformSigner,
-    PromoOwner,
-    Group,
-    GroupMember,
-    GroupSeed,
+    Merchant,
+    Campaign,
+    DeviceOnwer
 }
 
 #[derive(Parser)]
@@ -40,13 +39,10 @@ struct Cli {
     platform_path: PathBuf,
     #[clap(long, default_value = "../../target/deploy/platform_signer-keypair.json", value_parser = valid_file_path)]
     platform_signer_path: PathBuf,
-    #[clap(long, default_value = "../../target/deploy/promo_owner-keypair.json", value_parser = valid_file_path)]
-    promo_owner_path: PathBuf,
-    #[clap(long, default_value = "../../target/deploy/group_member_1-keypair.json", value_parser = valid_file_path)]
-    group_member_path: PathBuf,
-    #[clap(long, default_value = "../../target/deploy/group_seed-keypair.json", value_parser = valid_file_path)]
-
-    group_seed_path: PathBuf,
+    #[clap(long, default_value = "../../target/deploy/merchant-keypair.json", value_parser = valid_file_path)]
+    merchant_path: PathBuf,
+    #[clap(long, default_value = "../../target/deploy/device_owner-keypair.json", value_parser = valid_file_path)]
+    device_owner_path: PathBuf,
     #[clap(long, default_value_t = Cluster::Localnet, value_parser)]
     cluster: Cluster,
 }
@@ -67,14 +63,24 @@ enum Commands {
         burn_promo_token_lamports: u64,
     },
     CreateCampaign {
+        #[clap(long, default_value = "Test Campaign")]
+        name: String,
+        #[clap(long, default_value = "https://campaign.example.com")]
+        uri: String,
         #[clap(long, default_value_t = 500_000_000, value_parser)]
         lamports: u64,
     },
     #[clap(about = "Tesing requesting data from graphql api")]
     TestGql,
     Balance {
-        #[clap(arg_enum, default_value = "group")]
-        address: Address
+        #[clap(arg_enum, default_value = "campaign")]
+        address: Address,
+        #[clap(long, default_value = "Test Campaign")]
+        campaign_name: String
+    },
+    InstructionDiscriminator {
+        #[clap(long)]
+        name: String
     }
 }
 
@@ -96,16 +102,15 @@ async fn main() -> anyhow::Result<()> {
         program_authority_keypair,
         platform_keypair,
         platform_signer_keypair,
-        promo_owner_keypair,
-        group_member_keypair,
-        group_seed_keypair]: [Keypair; 6] = 
+        merchant_keypair,
+        device_owner_keypair,
+        ]: [Keypair; 5] = 
         [
         &cli.program_authority_path,
         &cli.platform_path,
         &cli.platform_signer_path,
-        &cli.promo_owner_path,
-        &cli.group_member_path,
-        &cli.group_seed_path,
+        &cli.merchant_path,
+        &cli.device_owner_path,
     ]
     .map(|p| read_keypair_file(p).expect("problem reading keypair file"));
 
@@ -120,13 +125,11 @@ async fn main() -> anyhow::Result<()> {
             );
 
             let program = client.program(bpl_token_metadata::id());
-            let (group, _) = find_group_address(&group_seed_keypair.pubkey());
-
+            
             for pubkey in [
                 &program_authority,
                 &platform_signer_keypair.pubkey(),
-                &promo_owner_keypair.pubkey(),
-                &group
+                &merchant_keypair.pubkey(),
             ] {
                 program
                 .rpc()
@@ -136,7 +139,7 @@ async fn main() -> anyhow::Result<()> {
             };
             Ok(())
         }
-        Commands::Balance { address } => {
+        Commands::Balance { address, campaign_name } => {
             let program_authority = program_authority_keypair.pubkey();
             let rc_payer_keypair = Rc::new(program_authority_keypair);
             let client = Client::new_with_options(
@@ -157,18 +160,15 @@ async fn main() -> anyhow::Result<()> {
                 Address::PlatformSigner => {
                     platform_signer_keypair.pubkey()
                 }
-                Address::PromoOwner => {
-                    promo_owner_keypair.pubkey()
+                Address::Merchant => {
+                    merchant_keypair.pubkey()
                 }
-                Address::Group => {
-                    let (address, _) = find_group_address(&group_seed_keypair.pubkey());
+                Address::Campaign => {
+                    let (address, _) = find_campaign_address(&merchant_keypair.pubkey(), campaign_name);
                     address
                 }
-                Address::GroupMember => {
-                    group_member_keypair.pubkey()
-                }
-                Address::GroupSeed => {
-                    group_seed_keypair.pubkey()
+                Address::DeviceOnwer => {
+                    device_owner_keypair.pubkey()
                 }
             };
             let balance = program
@@ -222,10 +222,12 @@ async fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Commands::CreateCampaign {
+            name,
+            uri,
             lamports
         } => {
-            let payer = promo_owner_keypair.pubkey();
-            let rc_payer_keypair = Rc::new(promo_owner_keypair);
+            let payer = merchant_keypair.pubkey();
+            let rc_payer_keypair = Rc::new(merchant_keypair);
             let client = Client::new_with_options(
                 cli.cluster,
                 rc_payer_keypair,
@@ -234,40 +236,44 @@ async fn main() -> anyhow::Result<()> {
 
             let program = client.program(bpl_token_metadata::id());
 
-            let (promo_group, nonce) = find_group_address(&group_seed_keypair.pubkey());
-            let members = vec![
+            let merchant = find_merchant_address(&payer).0;
+            let campaign = find_campaign_address(&merchant, name).0;
+            
+            // this needs to be updated for actual location, just addresses for now
+            let locations = vec![
                 payer,
-                group_member_keypair.pubkey(),
+                device_owner_keypair.pubkey(),
                 platform_signer_keypair.pubkey()
                 ];
 
             let data = Campaign {
-                    owner: payer,
-                    seed: group_seed_keypair.pubkey(),
-                    nonce,
-                    members,
+                    merchant,
+                    name: name.clone(),
+                    uri: uri.clone(),
+                    active: true,
+                    locations,
                 };
 
             let tx = program
             .request()
-            .accounts(accounts::CreatePromoGroup {
+            .accounts(accounts::CreateCampaign {
                 payer,
-                seed: group_seed_keypair.pubkey(),
-                promo_group,
+                merchant,
+                campaign,
                 memo_program: spl_memo::ID,
                 system_program: system_program::ID,
             })
-            .args(instruction::CreatePromoGroup {
+            .args(instruction::CreateCampaign {
                 data,
                 lamports: lamports.clone(),
                 memo: None,
             })
             .send()?;
             
-            let promo_group_account: Campaign = program.account(promo_group)?;
+            let campaign_account: Campaign = program.account(campaign)?;
             tracing::info!(
                 signature = tx.to_string(),
-                promo_group_account = format!("{:?}", promo_group_account)
+                campaign = format!("{:?}", campaign_account)
             );
                 
             Ok(())
@@ -349,6 +355,24 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", result);
             Ok(())
         }
+        Commands::InstructionDiscriminator { name } => {
+            pub fn sighash(namespace: &str, name: &str) {
+                let preimage = format!("{}:{}", namespace, name);
+            
+                let mut sighash = [0u8; 8];
+                sighash.copy_from_slice(
+                    &anchor_client::anchor_lang::solana_program::hash::hash(preimage.as_bytes()).to_bytes()
+                        [..8],
+                );
+                println!("{:?}", sighash);
+
+            }
+
+            sighash("global", name); 
+            
+            Ok(())
+        }
+
     }
 }
 

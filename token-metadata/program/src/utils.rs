@@ -131,7 +131,8 @@ pub fn find_merchant_address(owner: &Pubkey) -> (Pubkey, u8) {
     Pubkey::find_program_address(&[MERCHANT_PREFIX.as_bytes(), owner.as_ref()], &crate::id())
 }
 
-pub fn find_location_address(merchant: &Pubkey, name: &str) -> (Pubkey, u8) {
+pub fn find_location_address(merchant_owner: &Pubkey, name: &str) -> (Pubkey, u8) {
+    let merchant = find_merchant_address(&merchant_owner).0;
     Pubkey::find_program_address(
         &[
             LOCATION_PREFIX.as_bytes(),

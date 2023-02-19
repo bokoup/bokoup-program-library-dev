@@ -3,10 +3,10 @@ use crate::{state::Location, utils::create_memo, CreateLocation};
 use anchor_lang::prelude::*;
 
 impl<'info> CreateLocation<'info> {
-    pub fn process(&mut self, location_data: Location, memo: Option<String>) -> Result<()> {
+    pub fn process(&mut self, data: Location, memo: Option<String>) -> Result<()> {
         msg!("Create location");
 
-        *self.location = location_data;
+        *self.location = data;
 
         if let Some(memo) = memo {
             let account_infos = vec![self.payer.to_account_info()];

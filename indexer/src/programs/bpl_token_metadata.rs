@@ -1,5 +1,5 @@
 use crate::{AccountMessageData, TransactionMessageData};
-use anchor_lang::AccountDeserialize;
+use anchor_lang::{AccountDeserialize, Discriminator};
 use bpl_api_data::{
     queries::bpl_token_metadata::{
         burn_delegated_promo_token, campaign, create_campaign, create_promo, delegate_promo_token,
@@ -7,10 +7,7 @@ use bpl_api_data::{
     },
     Client,
 };
-pub use bpl_token_metadata::{
-    state::{Campaign, Promo},
-    ID,
-};
+pub use bpl_token_metadata::{instruction, state, ID};
 
 #[tracing::instrument(skip_all)]
 async fn process_promo<'a>(
@@ -20,7 +17,7 @@ async fn process_promo<'a>(
     slot: u64,
     write_version: u64,
 ) {
-    match Promo::try_deserialize(buf) {
+    match state::Promo::try_deserialize(buf) {
         Ok(ref account) => promo::upsert(pg_client, key, account, slot, write_version).await,
         Err(error) => {
             tracing::error!(id = bs58::encode(key).into_string(), ?error)
@@ -29,14 +26,14 @@ async fn process_promo<'a>(
 }
 
 #[tracing::instrument(skip_all)]
-async fn process_promo_group<'a>(
+async fn process_campaign<'a>(
     pg_client: &Client,
     key: &[u8],
     buf: &mut &[u8],
     slot: u64,
     write_version: u64,
 ) {
-    match Campaign::try_deserialize(buf) {
+    match state::Campaign::try_deserialize(buf) {
         Ok(ref account) => campaign::upsert(pg_client, key, account, slot, write_version).await,
         Err(error) => {
             tracing::error!(id = bs58::encode(key).into_string(), ?error)
@@ -50,18 +47,22 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
     let slot = message.slot;
     let write_version = message.account.write_version;
 
-    match buf.len() {
-        Promo::LEN => process_promo(&pg_client, key, &mut buf, slot, write_version).await,
-        Campaign::LEN => process_promo_group(&pg_client, key, &mut buf, slot, write_version).await,
-        _ => (),
+    let discriminator = &buf[..8];
+
+    if discriminator == state::Promo::discriminator() {
+        process_promo(&pg_client, key, &mut buf, slot, write_version).await
+    } else if discriminator == state::Campaign::discriminator() {
+        process_campaign(&pg_client, key, &mut buf, slot, write_version).await
+    } else {
+        ()
     }
 }
 #[non_exhaustive]
 #[derive(Debug)]
-pub struct Discriminator;
+pub struct Discriminatorio;
 
-impl Discriminator {
-    pub const CREATE_PROMO_GROUP: [u8; 8] = [249, 176, 197, 218, 167, 92, 64, 22];
+impl Discriminatorio {
+    pub const CREATE_CAMPAIGN: [u8; 8] = [249, 176, 197, 218, 167, 92, 64, 22];
     pub const CREATE_PROMO: [u8; 8] = [135, 231, 68, 194, 63, 31, 192, 82];
     pub const MINT_PROMO_TOKEN: [u8; 8] = [75, 139, 89, 205, 32, 105, 163, 161];
     pub const DELEGATE_PROMO_TOKEN: [u8; 8] = [85, 206, 226, 194, 207, 166, 164, 22];
@@ -77,7 +78,7 @@ pub async fn process_transaction<'a>(
     let discriminator = message.data[..8].try_into().unwrap_or([0; 8]);
 
     match discriminator {
-        Discriminator::CREATE_PROMO_GROUP => {
+        Discriminatorio::CREATE_CAMPAIGN => {
             create_campaign::upsert(
                 &pg_client,
                 &message.signature,
@@ -88,7 +89,7 @@ pub async fn process_transaction<'a>(
             .await
         }
 
-        Discriminator::CREATE_PROMO => {
+        Discriminatorio::CREATE_PROMO => {
             create_promo::upsert(
                 &pg_client,
                 &message.signature,
@@ -98,7 +99,7 @@ pub async fn process_transaction<'a>(
             )
             .await
         }
-        Discriminator::MINT_PROMO_TOKEN => {
+        Discriminatorio::MINT_PROMO_TOKEN => {
             mint_promo_token::upsert(
                 &pg_client,
                 &message.signature,
@@ -108,7 +109,7 @@ pub async fn process_transaction<'a>(
             )
             .await
         }
-        Discriminator::DELEGATE_PROMO_TOKEN => {
+        Discriminatorio::DELEGATE_PROMO_TOKEN => {
             delegate_promo_token::upsert(
                 &pg_client,
                 &message.signature,
@@ -118,7 +119,7 @@ pub async fn process_transaction<'a>(
             )
             .await
         }
-        Discriminator::BURN_DELEGATED_PROMO_TOKEN => {
+        Discriminatorio::BURN_DELEGATED_PROMO_TOKEN => {
             burn_delegated_promo_token::upsert(
                 &pg_client,
                 &message.signature,
@@ -128,7 +129,7 @@ pub async fn process_transaction<'a>(
             )
             .await
         }
-        Discriminator::SIGN_MEMO => {
+        Discriminatorio::SIGN_MEMO => {
             sign_memo::upsert(
                 &pg_client,
                 &message.signature,

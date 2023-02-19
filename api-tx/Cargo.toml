@@ -39,3 +39,4 @@ urlencoding = "2.1.2"
 [dev-dependencies]
 hyper = { version = "0.14", features = ["full"] }
 dotenv = "0.15"
+anchor-client = "0.24.2"

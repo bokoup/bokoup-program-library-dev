@@ -474,6 +474,11 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
+        } else if table == "create_device" {
+            queries::bpl_token_metadata::create_device::upsert(
+                client, signature, accounts, data, slot,
+            )
+            .await;
         } else if table == "sign_memo" {
             queries::bpl_token_metadata::sign_memo::upsert(client, signature, accounts, data, slot)
                 .await;
@@ -525,6 +530,7 @@ mod tests {
 
         for table in vec![
             "create_location",
+            "create_device",
             "create_campaign",
             "create_promo",
             "mint_promo_token",
@@ -664,6 +670,7 @@ mod tests {
             burn_count: 0,
             max_mint: Some(88),
             max_burn: Some(42),
+            active: true,
         };
 
         it_upserts_promo(&client, key.as_ref(), &promo, 42, 1).await;

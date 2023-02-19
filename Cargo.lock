@@ -677,6 +677,7 @@ dependencies = [
 name = "bpl-api-tx"
 version = "0.1.0"
 dependencies = [
+ "anchor-client",
  "anchor-lang",
  "anchor-spl",
  "axum",

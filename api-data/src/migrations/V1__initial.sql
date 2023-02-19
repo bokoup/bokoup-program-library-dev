@@ -76,6 +76,7 @@ CREATE TABLE public.promo (
     burn_count int NOT NULL,
     max_mint int,
     max_burn int,
+    active boolean NOT NULL,
     slot bigint NOT NULL,
     write_version bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -112,6 +113,20 @@ CREATE TABLE public.create_location (
 );
 ALTER TABLE ONLY public.create_location
     ADD CONSTRAINT create_location_pkey PRIMARY KEY (signature);
+
+CREATE TABLE public.create_device (
+    signature text NOT NULL,
+    payer text NOT NULL,
+    merchant text NOT NULL,
+    location text NOT NULL,
+    device text NOT NULL,
+    memo jsonb,
+    slot bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.create_device
+    ADD CONSTRAINT create_device_pkey PRIMARY KEY (signature);
 
 CREATE TABLE public.create_campaign (
     signature text NOT NULL,

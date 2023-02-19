@@ -107,72 +107,32 @@ export class TokenMetadataProgram {
     return adminSettings;
   }
 
-  async createMerchant(
-    merchantData: Merchant,
-    locationName: string,
-    locationUri: string,
-    deviceOwner: PublicKey,
-    deviceName: string,
-    deviceUri: string,
-    campaignName: string,
-    campaignUri: string,
-    lamports: number,
-    memo: string | null,
-  ): Promise<[string, PublicKey, PublicKey, PublicKey, PublicKey]> {
+  async createMerchant(merchantData: Merchant, memo: string | null): Promise<[string, PublicKey]> {
     const merchant = this.findMerchantAddress(merchantData.owner);
-    const location = this.findLocationAddress(merchant, locationName);
-    const device = this.findDeviceAddress(location, deviceName);
-    const campaign = this.findCampaignAddress(merchant, campaignName);
-
-    const locationData: Location = {
-      merchant,
-      name: locationName,
-      uri: locationUri,
-      active: true,
-    };
-
-    const deviceData: Device = {
-      owner: deviceOwner,
-      location,
-      name: deviceName,
-      uri: deviceUri,
-      active: true,
-    };
-
-    const campaignData: Campaign = {
-      merchant,
-      name: campaignName,
-      uri: campaignUri,
-      locations: [location],
-      active: true,
-    };
 
     const tx = await this.program.methods
-      .createMerchant(merchantData, locationData, deviceData, campaignData, new BN(lamports), memo)
+      .createMerchant(merchantData, memo)
       .accounts({
         merchant,
-        location,
-        device,
-        campaign,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
       .rpc();
 
-    return [tx, merchant, location, device, campaign];
+    return [tx, merchant];
   }
 
   async createLocation(
-    locationName: string,
-    locationUri: string,
+    name: string,
+    uri: string,
     memo: string | null,
   ): Promise<[string, PublicKey]> {
     const merchant = this.findMerchantAddress(this.payer.publicKey);
-    const location = this.findLocationAddress(merchant, locationName);
+    const location = this.findLocationAddress(merchant, name);
 
     const locationData: Location = {
       merchant,
-      name: locationName,
-      uri: locationUri,
+      name,
+      uri,
       active: true,
     };
 
@@ -188,6 +148,37 @@ export class TokenMetadataProgram {
     return [tx, location];
   }
 
+  async createDevice(
+    owner: PublicKey,
+    name: string,
+    uri: string,
+    location: PublicKey,
+    memo: string | null,
+  ): Promise<[string, PublicKey]> {
+    const merchant = this.findMerchantAddress(this.payer.publicKey);
+    const device = this.findDeviceAddress(location, name);
+
+    const data: Device = {
+      owner,
+      location,
+      name,
+      uri,
+      active: true,
+    };
+
+    const tx = await this.program.methods
+      .createDevice(data, memo)
+      .accounts({
+        merchant,
+        location,
+        device,
+        memoProgram: this.MEMO_PROGRAM_ID,
+      })
+      .rpc();
+
+    return [tx, device];
+  }
+
   async createCampaign(
     name: string,
     uri: String,
@@ -195,7 +186,7 @@ export class TokenMetadataProgram {
     active: boolean,
     lamports: number,
     memo: string | null,
-  ): Promise<PublicKey> {
+  ): Promise<[string, PublicKey]> {
     const merchant = this.findMerchantAddress(this.payer.publicKey);
     const campaign = this.findCampaignAddress(merchant, name);
 
@@ -207,7 +198,7 @@ export class TokenMetadataProgram {
       active,
     };
 
-    await this.program.methods
+    const tx = await this.program.methods
       .createCampaign(campaignData, new BN(lamports), memo)
       .accounts({
         merchant,
@@ -215,7 +206,7 @@ export class TokenMetadataProgram {
         memoProgram: this.MEMO_PROGRAM_ID,
       })
       .rpc();
-    return campaign;
+    return [tx, campaign];
   }
 
   /**

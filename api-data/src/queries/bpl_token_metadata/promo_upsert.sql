@@ -7,10 +7,11 @@ INSERT INTO promo (
     burn_count,
     max_mint,
     max_burn,
+    active,
     slot,
     write_version
 )
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT ON CONSTRAINT promo_pkey DO UPDATE 
     SET
         campaign = EXCLUDED.campaign,
@@ -20,6 +21,7 @@ ON CONFLICT ON CONSTRAINT promo_pkey DO UPDATE
         burn_count = EXCLUDED.burn_count,
         max_mint = EXCLUDED.max_mint,
         max_burn = EXCLUDED.max_burn,
+        active = EXCLUDED.active,
         slot = EXCLUDED.slot,
         write_version = EXCLUDED.write_version,
         modified_at = NOW()

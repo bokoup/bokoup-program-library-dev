@@ -19,12 +19,18 @@ pub enum AppError {
     BincodeError(#[from] Box<bincode::ErrorKind>),
     #[error("bundlr: {0}")]
     BundlrError(#[from] bundlr_sdk::error::BundlrError),
+    #[error("bundlr response error: {0}")]
+    BundlrResponseError(String),
     #[error("create promo request: {0}")]
     CreatePromoRequestError(String),
     #[error("data query error")]
     DataQueryError,
     #[error("keypair error")]
     KeyPairError(#[from] ed25519_dalek::ed25519::Error),
+    #[error("metadata error: {0}")]
+    MultipartMetadataError(String),
+    #[error("image error: {0}")]
+    MultipartImageError(String),
     #[error("pubkey error")]
     PubkeyError(#[from] ParsePubkeyError),
     #[error("payer not in members")]

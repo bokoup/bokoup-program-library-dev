@@ -18,17 +18,15 @@ pub async fn upload_image(
 
     // Get id of uploaded image and add to metdata json.
     let response = state.bundlr.send_transaction(tx).await?;
-    let image_id = response
-        .as_object()
-        .ok_or(AppError::CreatePromoRequestError(
-            "bundlr respsons should be an object".to_string(),
-        ))?;
+    let image_id = response.as_object().ok_or(AppError::BundlrResponseError(
+        "bundlr respsonse should be an object".to_string(),
+    ))?;
 
     let image_url = format!(
         "https://arweave.net/{}",
         image_id["id"]
             .as_str()
-            .ok_or(AppError::CreatePromoRequestError(
+            .ok_or(AppError::BundlrResponseError(
                 "id field should exist in bundlr response".to_string(),
             ))?
     );
@@ -40,10 +38,41 @@ pub async fn upload_image(
 
 pub async fn upload_metadata_json(
     metadata_data_obj: &mut Map<String, Value>,
-    image_url: String,
-    content_type: String,
     state: Arc<State>,
 ) -> Result<(String, Arc<State>), AppError> {
+    // Upload json metadata to Arweave and get id back for inclusion in creation of on chain Promo.
+    let tx = state.bundlr.create_transaction_with_tags(
+        serde_json::to_vec(metadata_data_obj)?,
+        vec![
+            Tag::new("User-Agent".into(), "bokoup".into()),
+            Tag::new("Content-Type".into(), "application/json".to_string()),
+        ],
+    );
+
+    let response = state.bundlr.send_transaction(tx).await?;
+    let metadata_id = response.as_object().ok_or(AppError::BundlrResponseError(
+        "bundlr respsons should be an object".to_string(),
+    ))?;
+
+    let uri = format!(
+        "https://arweave.net/{}",
+        metadata_id["id"]
+            .as_str()
+            .ok_or(AppError::BundlrResponseError(
+                "id field should exist in bundlr response".to_string(),
+            ))?
+    );
+
+    tracing::debug!(metadata_json_uri = &uri);
+
+    Ok((uri, state))
+}
+
+pub async fn update_promo_metadata_json(
+    metadata_data_obj: &mut Map<String, Value>,
+    image_url: String,
+    content_type: String,
+) -> Result<&mut Map<String, Value>, AppError> {
     metadata_data_obj.insert("image".to_string(), image_url.clone().into());
 
     metadata_data_obj.insert(
@@ -57,32 +86,14 @@ pub async fn upload_metadata_json(
         }),
     );
 
-    // Upload json metadata to Arweave and get id back for inclusion in creation of on chain Promo.
-    let tx = state.bundlr.create_transaction_with_tags(
-        serde_json::to_vec(metadata_data_obj)?,
-        vec![
-            Tag::new("User-Agent".into(), "bokoup".into()),
-            Tag::new("Content-Type".into(), "application/json".to_string()),
-        ],
-    );
+    Ok(metadata_data_obj)
+}
 
-    let response = state.bundlr.send_transaction(tx).await?;
-    let metadata_id = response
-        .as_object()
-        .ok_or(AppError::CreatePromoRequestError(
-            "bundlr respsons should be an object".to_string(),
-        ))?;
-
-    let uri = format!(
-        "https://arweave.net/{}",
-        metadata_id["id"]
-            .as_str()
-            .ok_or(AppError::CreatePromoRequestError(
-                "id field should exist in bundlr response".to_string(),
-            ))?
-    );
-
-    tracing::debug!(metadata_json_uri = &uri);
-
-    Ok((uri, state))
+pub fn update_metadata_json(
+    metadata_data_obj: &mut Map<String, Value>,
+    image_url: String,
+) -> Result<(), AppError> {
+    metadata_data_obj.insert("image".to_string(), image_url.clone().into());
+    metadata_data_obj.remove("active");
+    Ok(())
 }

@@ -132,6 +132,7 @@ pub struct Promo {
     pub burn_count: u32,
     pub max_mint: Option<u32>,
     pub max_burn: Option<u32>,
+    pub active: bool,
 }
 
 impl Promo {
@@ -142,7 +143,8 @@ impl Promo {
     + 4         // mint_count
     + 4         // burn_count
     + 1 + 4     // max_mint
-    + 1 + 4; // max_redeem
+    + 1 + 4 // max_burn
+    + 1; //active
 }
 
 //==============================

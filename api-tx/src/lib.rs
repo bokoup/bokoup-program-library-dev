@@ -46,7 +46,13 @@ pub struct State {
 }
 
 impl State {
-    fn new(cluster: Cluster, platform: Pubkey, platform_signer: Keypair, data_url: Url) -> Self {
+    fn new(
+        cluster: Cluster,
+        commitment: CommitmentLevel,
+        platform: Pubkey,
+        platform_signer: Keypair,
+        data_url: Url,
+    ) -> Self {
         let keypair = DalekKeypair::from_bytes(&platform_signer.to_bytes()).unwrap();
         let signer = Ed25519Signer::new(keypair);
 
@@ -55,7 +61,7 @@ impl State {
             platform,
             solana: Solana {
                 cluster,
-                commitment: CommitmentLevel::Confirmed,
+                commitment,
                 client: reqwest::Client::builder()
                     .timeout(Duration::from_secs(10))
                     .build()
@@ -85,48 +91,68 @@ pub fn create_app(
 
     Router::new()
         .route(
-            "/promo/mint/:mint_string/:message",
+            "/promo/mint/:mint/:location/:device/:campaign/:token_owner/:message",
             get(get_app_id::handler).post(get_mint_promo_tx::handler),
         )
         .route(
-            "/promo/mint/:mint_string/:message/:memo",
+            "/promo/mint/:mint/:location/:device/:campaign/:token_owner/:message/:memo",
             get(get_app_id::handler).post(get_mint_promo_tx::handler),
         )
         .route(
-            "/promo/group/:group_seed/:members/:lamports",
-            get(get_app_id::handler).post(get_create_promo_group_tx::handler),
-        )
-        .route(
-            "/promo/group/:group_seed/:members/:lamports/:memo",
-            get(get_app_id::handler).post(get_create_promo_group_tx::handler),
-        )
-        .route(
-            "/promo/delegate/:mint_string/:delegate_string/:message",
+            "/promo/delegate/:mint/:device_owner/:location/:device/:campaign/:message",
             get(get_app_id::handler).post(get_delegate_promo_tx::handler),
         )
         .route(
-            "/promo/delegate/:mint_string/:delegate_string/:message/:memo",
+            "/promo/delegate/:mint/:device_owner/:location/:device/:campaign/:message/:memo",
             get(get_app_id::handler).post(get_delegate_promo_tx::handler),
         )
         .route(
-            "/promo/burn-delegated/:token_account_string/:message",
+            "/promo/burn-delegated/:mint/:token_account/:location/:device/:campaign/:message",
             get(get_app_id::handler).post(get_burn_delegated_promo_tx::handler),
         )
         .route(
-            "/promo/burn-delegated/:token_account_string/:message/:memo",
+            "/promo/burn-delegated/:mint/:token_account/:location/:device/:campaign/:message/:memo",
             get(get_app_id::handler).post(get_burn_delegated_promo_tx::handler),
         )
         .route(
-            "/promo/create/:payer/:group_seed",
+            "/promo/create/:payer/:campaign",
             get(get_app_id::handler).post(get_create_promo_tx::handler),
         )
         .route(
-            "/promo/create/:payer/:group_seed/:memo",
+            "/promo/create/:payer/:campaign/:memo",
             get(get_app_id::handler).post(get_create_promo_tx::handler),
         )
         .route(
             "/signmemo/:message/:memo",
             get(get_app_id::handler).post(get_sign_memo_tx::handler),
+        )
+        .route(
+            "/merchant/create/:payer",
+            get(get_app_id::handler).post(get_create_merchant_tx::handler),
+        )
+        .route(
+            "/merchant/create/:payer/:memo",
+            get(get_app_id::handler).post(get_create_merchant_tx::handler),
+        )
+        .route(
+            "/location/create/:payer",
+            get(get_app_id::handler).post(get_create_location_tx::handler),
+        )
+        .route(
+            "/location/create/:payer/:memo",
+            get(get_app_id::handler).post(get_create_location_tx::handler),
+        )
+        .route(
+            "/device/create/:payer/:location/:owner/",
+            get(get_app_id::handler).post(get_create_device_tx::handler),
+        )
+        .route(
+            "/device/create/:payer/:location/:owner/:memo",
+            get(get_app_id::handler).post(get_create_device_tx::handler),
+        )
+        .route(
+            "/campaign/create/:payer/:lamports/:memo/*locations",
+            get(get_app_id::handler).post(get_create_campaign_tx::handler),
         )
         .layer(
             ServiceBuilder::new()
@@ -138,6 +164,7 @@ pub fn create_app(
                 .layer(TraceLayer::new_for_http())
                 .layer(AddExtensionLayer::new(Arc::new(State::new(
                     cluster,
+                    CommitmentLevel::Confirmed,
                     platform,
                     platform_signer,
                     data_url,
@@ -168,16 +195,23 @@ async fn handle_error(error: BoxError) -> impl IntoResponse {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use anchor_lang::prelude::Pubkey;
+    use anchor_lang::{prelude::Pubkey, AnchorDeserialize};
     use axum::{
         body::Body,
         http::{Method, Request, StatusCode},
     };
-    use bpl_token_metadata::utils::find_group_address;
+    use bpl_token_metadata::{
+        state::Merchant,
+        utils::{find_campaign_address, find_location_address, find_merchant_address},
+    };
+    use futures::future::FutureExt;
     use handlers::PayResponse;
-    use solana_sdk::{signature::Signer, transaction::Transaction};
+    use solana_sdk::{
+        commitment_config::CommitmentConfig, signature::Signer, transaction::Transaction,
+    };
     use std::{
         net::{SocketAddr, TcpListener},
+        rc::Rc,
         str::FromStr,
     };
     use tokio::fs;
@@ -264,13 +298,21 @@ pub mod test {
     }
 
     #[tokio::test]
-    async fn test_app_id() {
+    pub async fn run_tests() {
         std::env::set_var("RUST_LOG", "bpl_api_tx=trace");
         tracing_subscriber::registry()
             .with(fmt::layer())
             .with(EnvFilter::from_default_env())
             .init();
+        // dotenv::dotenv().ok();
+        // fund_accounts().await;
+        // test_create_merchant().await;
+        // test_create_location().await;
+        // test_create_device().await;
+    }
 
+    #[tokio::test]
+    async fn test_app_id() {
         dotenv::dotenv().ok();
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
@@ -288,7 +330,12 @@ pub mod test {
             .oneshot(
                 Request::builder()
                     .uri(format!(
-                        "/promo/mint/{}/{}",
+                        "/promo/mint/{}/{}/{}/{}/{}/{}/{}",
+                        mint.to_string(),
+                        mint.to_string(),
+                        mint.to_string(),
+                        mint.to_string(),
+                        mint.to_string(),
                         mint.to_string(),
                         message.into_owned(),
                     ))
@@ -320,15 +367,6 @@ pub mod test {
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
 
-        // ok to be devnet, only pulling blockhash - will succeed even if localnet validator not running
-        let platform_signer_pubkey = platform_signer.pubkey();
-
-        let state = State::new(
-            Cluster::Devnet,
-            Pubkey::from_str(PLATFORM.into()).unwrap(),
-            Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
-            Url::from_str(DATA_URL).unwrap(),
-        );
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
@@ -336,28 +374,15 @@ pub mod test {
             Url::from_str(DATA_URL).unwrap(),
         );
 
+        let mint = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
+        let device = Pubkey::new_unique();
+        let campaign = Pubkey::new_unique();
         let token_owner = Pubkey::new_unique();
-
-        let mint = fetch_mint(&state.data_url.to_string()).await;
-
-        let query =
-            serde_json::json!({ "query": MINT_QUERY, "variables": {"mint": mint.to_string()}});
-        let result: serde_json::Value = state
-            .solana
-            .client
-            .post(&state.data_url.to_string())
-            .json(&query)
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        let group = get_group_from_promo_group_query(&platform_signer_pubkey, &result).unwrap();
+        let device_owner = Pubkey::new_unique();
 
         let data = get_mint_promo_tx::Data {
-            account: token_owner.to_string(),
+            account: device_owner.to_string(),
         };
         let message = urlencoding::encode(MESSAGE);
         let memo = "jingus";
@@ -368,8 +393,12 @@ pub mod test {
                 Request::builder()
                     .method(Method::POST)
                     .uri(format!(
-                        "/promo/mint/{}/{}/{}",
+                        "/promo/mint/{}/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
+                        location.to_string(),
+                        device.to_string(),
+                        campaign.to_string(),
+                        token_owner.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
                     ))
@@ -384,23 +413,19 @@ pub mod test {
 
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
-        let txd: Transaction = bincode::deserialize(
-            &base64::decode::<String>(parsed_response.transaction.clone()).unwrap(),
-        )
-        .unwrap();
 
         let instruction = create_mint_promo_instruction(
-            Pubkey::new(platform_signer_pubkey.as_ref().clone()),
-            group,
+            device_owner,
+            location,
+            device,
+            campaign,
             token_owner,
             mint,
             Some(memo.to_string()),
         )
         .unwrap();
 
-        let mut tx = Transaction::new_with_payer(&[instruction], Some(&platform_signer_pubkey));
-        tx.try_partial_sign(&[&platform_signer], txd.message.recent_blockhash)
-            .unwrap();
+        let tx = Transaction::new_with_payer(&[instruction], Some(&device_owner));
         let serialized = bincode::serialize(&tx).unwrap();
         let transaction = base64::encode(serialized);
 
@@ -413,48 +438,25 @@ pub mod test {
         );
     }
 
-    // Platform signer is the payer, group member is the delegate
     #[tokio::test]
     async fn test_get_delegate_promo_tx() {
         dotenv::dotenv().ok();
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
 
-        let platform_signer_pubkey = platform_signer.pubkey();
-
-        let delegate = parse_string_to_keypair(&std::env::var("GROUP_MEMBER_1_KEYPAIR").unwrap());
-
-        let state = State::new(
-            Cluster::Localnet,
-            Pubkey::from_str(PLATFORM.into()).unwrap(),
-            Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
-            Url::from_str(DATA_URL).unwrap(),
-        );
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
-            platform_signer,
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap()),
             Url::from_str(DATA_URL).unwrap(),
         );
 
+        let mint = Pubkey::new_unique();
+        let device_owner = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
+        let device = Pubkey::new_unique();
+        let campaign = Pubkey::new_unique();
         let token_owner = Pubkey::new_unique();
-        let mint = fetch_mint(&state.data_url.to_string()).await;
-
-        let query =
-            serde_json::json!({ "query": MINT_QUERY, "variables": {"mint": mint.to_string()}});
-        let result: serde_json::Value = state
-            .solana
-            .client
-            .post(&state.data_url.to_string())
-            .json(&query)
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        let group = get_group_from_promo_group_query(&delegate.pubkey(), &result).unwrap();
 
         let data = get_mint_promo_tx::Data {
             account: token_owner.to_string(),
@@ -469,9 +471,12 @@ pub mod test {
                 Request::builder()
                     .method(Method::POST)
                     .uri(format!(
-                        "/promo/delegate/{}/{}/{}/{}",
+                        "/promo/delegate/{}/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
-                        delegate.pubkey().to_string(),
+                        device_owner.to_string(),
+                        location.to_string(),
+                        device.to_string(),
+                        campaign.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
                     ))
@@ -493,21 +498,106 @@ pub mod test {
         .unwrap();
 
         let instruction = create_delegate_promo_instruction(
-            platform_signer_pubkey,
-            delegate.pubkey(),
-            group,
+            platform_signer.pubkey(),
+            device_owner,
+            location,
+            device,
+            campaign,
             token_owner,
             mint,
             Some(memo.to_string()),
         )
         .unwrap();
 
-        let mut tx =
-            Transaction::new_with_payer(&[instruction], Some(&state.platform_signer.pubkey()));
+        let mut tx = Transaction::new_with_payer(&[instruction], Some(&platform_signer.pubkey()));
         let recent_blockhash = txd.message.recent_blockhash;
 
-        tx.try_partial_sign(&[&state.platform_signer], recent_blockhash)
+        tx.try_partial_sign(&[&platform_signer], recent_blockhash)
             .unwrap();
+        let serialized = bincode::serialize(&tx).unwrap();
+        let transaction = base64::encode(serialized);
+
+        assert_eq!(
+            parsed_response,
+            PayResponse {
+                transaction,
+                message: MESSAGE.to_owned(),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_burn_delegated_promo_tx() {
+        dotenv::dotenv().ok();
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let app = create_app(
+            Cluster::Devnet,
+            Pubkey::from_str(PLATFORM.into()).unwrap(),
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap()),
+            Url::from_str(DATA_URL).unwrap(),
+        );
+
+        let mint = Pubkey::new_unique();
+        let token_account = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
+        let device = Pubkey::new_unique();
+        let campaign = Pubkey::new_unique();
+        let device_owner = Pubkey::new_unique();
+
+        let data = get_mint_promo_tx::Data {
+            account: device_owner.to_string(),
+        };
+
+        let message = urlencoding::encode(MESSAGE);
+        let memo = r#"{"jingus": "amongus"}"#;
+        let memo_encoded = urlencoding::encode(memo);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri(format!(
+                        "/promo/burn-delegated/{}/{}/{}/{}/{}/{}/{}",
+                        mint.to_string(),
+                        token_account.to_string(),
+                        location.to_string(),
+                        device.to_string(),
+                        campaign.to_string(),
+                        message.into_owned(),
+                        memo_encoded.into_owned()
+                    ))
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(serde_json::to_vec(&data).unwrap()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
+
+        let txd: Transaction = bincode::deserialize(
+            &base64::decode::<String>(parsed_response.transaction.clone()).unwrap(),
+        )
+        .unwrap();
+
+        let instruction = create_burn_delegated_promo_instruction(
+            device_owner,
+            location,
+            device,
+            campaign,
+            token_account,
+            mint,
+            Pubkey::from_str(PLATFORM.into()).unwrap(),
+            Some(memo.to_string()),
+        )
+        .unwrap();
+
+        let tx = Transaction::new_with_payer(&[instruction], Some(&device_owner));
         let serialized = bincode::serialize(&tx).unwrap();
         let transaction = base64::encode(serialized);
 
@@ -530,6 +620,7 @@ pub mod test {
 
         let state = State::new(
             Cluster::Localnet,
+            CommitmentLevel::Confirmed,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
             Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
             Url::from_str(DATA_URL).unwrap(),
@@ -603,40 +694,12 @@ pub mod test {
     }
 
     #[tokio::test]
-    async fn test_create_buyxproduct_promo() {
+    async fn test_create_merchant() {
         dotenv::dotenv().ok();
-        let promo_owner = parse_string_to_keypair(&std::env::var("PROMO_OWNER_KEYPAIR").unwrap());
+        let merchant_owner =
+            parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
-
-        let group_seed = parse_string_to_keypair(&std::env::var("GROUP_SEED_KEYPAIR").unwrap());
-
-        let (group, _) = find_group_address(&group_seed.pubkey());
-
-        // This test requires a local validator to be running. Whereas the other tests return prepared
-        // transactions, this one sends a transaction to create a Promo on chain.
-        if let Ok(_) = TcpListener::bind("127.0.0.1:8899".parse::<SocketAddr>().unwrap()) {
-            assert!(false, "localnet validator not started")
-        }
-
-        let state = State::new(
-            Cluster::Localnet,
-            Pubkey::from_str(PLATFORM.into()).unwrap(),
-            Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
-            Url::from_str(DATA_URL).unwrap(),
-        );
-
-        state
-            .solana
-            .request_airdrop(promo_owner.pubkey().to_string(), 1_000_000_000)
-            .await
-            .unwrap();
-
-        state
-            .solana
-            .request_airdrop(group.to_string(), 1_000_000_000)
-            .await
-            .unwrap();
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
@@ -647,6 +710,343 @@ pub mod test {
                 .serve(
                     create_app(
                         Cluster::Localnet,
+                        Pubkey::from_str(PLATFORM.into()).unwrap(),
+                        platform_signer,
+                        Url::from_str(DATA_URL).unwrap(),
+                    )
+                    .into_make_service(),
+                )
+                .await
+                .unwrap();
+        });
+
+        let file_path = "./tests/fixtures/bokoup_logo_3.jpg";
+        let file = fs::read(file_path).await.unwrap();
+
+        let content_type = if let Some(content_type) = mime_guess::from_path(file_path).first() {
+            content_type.to_string()
+        } else {
+            mime_guess::mime::OCTET_STREAM.to_string()
+        };
+
+        let metadata_data = serde_json::json!({
+            "name": "Test Merchant",
+            "website": "https://bokoup.dev",
+            "description": "bokout test merchant",
+            "active": true
+        });
+
+        let form = reqwest::multipart::Form::new()
+            .part(
+                "metadata",
+                reqwest::multipart::Part::text(metadata_data.to_string())
+                    .mime_str("application/json")
+                    .unwrap(),
+            )
+            .part(
+                "image",
+                reqwest::multipart::Part::bytes(file)
+                    .file_name(file_path.split("/").last().unwrap())
+                    .mime_str(&content_type)
+                    .unwrap(),
+            );
+
+        let memo =
+            serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
+        let client = reqwest::Client::new();
+
+        tracing::debug!(merchant_owner = merchant_owner.pubkey().to_string());
+
+        let response = client
+            .post(format!(
+                "http://{}/merchant/create/{}/{}",
+                addr,
+                merchant_owner.pubkey(),
+                memo
+            ))
+            .multipart(form)
+            .send()
+            .await
+            .unwrap()
+            .json::<PayResponse>()
+            .await
+            .unwrap();
+
+        let tx: Transaction =
+            bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
+                .unwrap();
+
+        let instruction = bpl_token_metadata::instruction::CreateMerchant::try_from_slice(
+            &tx.message.instructions[0].data[8..],
+        )
+        .unwrap();
+
+        assert_eq!(instruction.data.name, "Test Merchant".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_create_location() {
+        dotenv::dotenv().ok();
+        let merchant_owner =
+            parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(
+                    create_app(
+                        Cluster::Localnet,
+                        Pubkey::from_str(PLATFORM.into()).unwrap(),
+                        platform_signer,
+                        Url::from_str(DATA_URL).unwrap(),
+                    )
+                    .into_make_service(),
+                )
+                .await
+                .unwrap();
+        });
+
+        let file_path = "./tests/fixtures/bokoup_logo_3.jpg";
+        let file = fs::read(file_path).await.unwrap();
+
+        let content_type = if let Some(content_type) = mime_guess::from_path(file_path).first() {
+            content_type.to_string()
+        } else {
+            mime_guess::mime::OCTET_STREAM.to_string()
+        };
+
+        let metadata_data = serde_json::json!({
+            "name": "Test Location",
+            "website": "https://bokoup.dev",
+            "description": "bokout test location",
+            "address": "123 Main Street, Anytown, CA 12345",
+            "active": true
+        });
+
+        let form = reqwest::multipart::Form::new()
+            .part(
+                "metadata",
+                reqwest::multipart::Part::text(metadata_data.to_string())
+                    .mime_str("application/json")
+                    .unwrap(),
+            )
+            .part(
+                "image",
+                reqwest::multipart::Part::bytes(file)
+                    .file_name(file_path.split("/").last().unwrap())
+                    .mime_str(&content_type)
+                    .unwrap(),
+            );
+
+        let memo =
+            serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
+        let client = reqwest::Client::new();
+
+        let response = client
+            .post(format!(
+                "http://{}/location/create/{}/{}",
+                addr,
+                merchant_owner.pubkey(),
+                memo,
+            ))
+            .multipart(form)
+            .send()
+            .await
+            .unwrap()
+            .json::<PayResponse>()
+            .await
+            .unwrap();
+
+        let tx: Transaction =
+            bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
+                .unwrap();
+
+        let instruction = bpl_token_metadata::instruction::CreateLocation::try_from_slice(
+            &tx.message.instructions[0].data[8..],
+        )
+        .unwrap();
+
+        assert_eq!(instruction.data.name, "Test Location".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_create_device() {
+        dotenv::dotenv().ok();
+        let merchant_owner =
+            parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(
+                    create_app(
+                        Cluster::Localnet,
+                        Pubkey::from_str(PLATFORM.into()).unwrap(),
+                        platform_signer,
+                        Url::from_str(DATA_URL).unwrap(),
+                    )
+                    .into_make_service(),
+                )
+                .await
+                .unwrap();
+        });
+
+        let metadata_data = serde_json::json!({
+            "name": "Test Device",
+            "reference": "012345677",
+            "description": "bokout test location",
+            "active": true
+        });
+
+        let form = reqwest::multipart::Form::new().part(
+            "metadata",
+            reqwest::multipart::Part::text(metadata_data.to_string())
+                .mime_str("application/json")
+                .unwrap(),
+        );
+
+        let location = find_location_address(&merchant_owner.pubkey(), "Test Location").0;
+
+        let memo =
+            serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
+        let client = reqwest::Client::new();
+
+        let response = client
+            .post(format!(
+                "http://{}/device/create/{}/{}/{}/{}",
+                addr,
+                merchant_owner.pubkey(),
+                location,
+                Pubkey::new_unique(),
+                memo,
+            ))
+            .multipart(form)
+            .send()
+            .await
+            .unwrap()
+            .json::<PayResponse>()
+            .await
+            .unwrap();
+
+        let tx: Transaction =
+            bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
+                .unwrap();
+
+        let instruction = bpl_token_metadata::instruction::CreateDevice::try_from_slice(
+            &tx.message.instructions[0].data[8..],
+        )
+        .unwrap();
+
+        assert_eq!(instruction.data.name, "Test Device".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_create_campaign() {
+        dotenv::dotenv().ok();
+        let merchant_owner =
+            parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(
+                    create_app(
+                        Cluster::Localnet,
+                        Pubkey::from_str(PLATFORM.into()).unwrap(),
+                        platform_signer,
+                        Url::from_str(DATA_URL).unwrap(),
+                    )
+                    .into_make_service(),
+                )
+                .await
+                .unwrap();
+        });
+
+        let metadata_data = serde_json::json!({
+            "name": "Test Campaign",
+            "reference": "012345677",
+            "description": "bokout test location",
+            "active": true
+        });
+
+        let form = reqwest::multipart::Form::new().part(
+            "metadata",
+            reqwest::multipart::Part::text(metadata_data.to_string())
+                .mime_str("application/json")
+                .unwrap(),
+        );
+
+        let location = find_location_address(&merchant_owner.pubkey(), "Test Location").0;
+        let location2 = find_location_address(&merchant_owner.pubkey(), "Test Location 2").0;
+
+        let memo =
+            serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
+        let client = reqwest::Client::new();
+
+        let response = client
+            .post(format!(
+                "http://{}/campaign/create/{}/{}/{}/{}/{}",
+                addr,
+                merchant_owner.pubkey(),
+                1_000_000_000,
+                memo,
+                location,
+                location2
+            ))
+            .multipart(form)
+            .send()
+            .await
+            .unwrap()
+            .json::<PayResponse>()
+            .await
+            .unwrap();
+
+        let tx: Transaction =
+            bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
+                .unwrap();
+
+        let instruction = bpl_token_metadata::instruction::CreateCampaign::try_from_slice(
+            &tx.message.instructions[0].data[8..],
+        )
+        .unwrap();
+
+        assert_eq!(instruction.data.name, "Test Campaign".to_string());
+        assert_eq!(instruction.data.locations, vec![location, location2]);
+    }
+
+    #[tokio::test]
+    async fn test_create_promo() {
+        dotenv::dotenv().ok();
+        let merchant_owner =
+            parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        // ok to be devnet, just getting blockhash for test
+        tokio::spawn(async move {
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(
+                    create_app(
+                        Cluster::Devnet,
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
@@ -698,7 +1098,8 @@ pub mod test {
             "collection": {
                 "name": "Product Promo",
                 "family": "Test Merchant Promos"
-            }
+            },
+            "active": true
         });
 
         let form = reqwest::multipart::Form::new()
@@ -716,15 +1117,18 @@ pub mod test {
                     .unwrap(),
             );
 
+        let campaign = find_campaign_address(&merchant_owner.pubkey(), "Test Campaign").0;
+
         let memo =
             serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
         let client = reqwest::Client::new();
+
         let response = client
             .post(format!(
                 "http://{}/promo/create/{}/{}/{}",
                 addr,
-                promo_owner.pubkey(),
-                group_seed.pubkey().to_string(),
+                merchant_owner.pubkey(),
+                campaign,
                 memo,
             ))
             .multipart(form)
@@ -735,172 +1139,15 @@ pub mod test {
             .await
             .unwrap();
 
-        let mut txd: Transaction =
+        let tx: Transaction =
             bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
                 .unwrap();
 
-        txd.try_partial_sign(&[&promo_owner], txd.message.recent_blockhash)
-            .unwrap();
+        let instruction = bpl_token_metadata::instruction::CreatePromo::try_from_slice(
+            &tx.message.instructions[0].data[8..],
+        )
+        .unwrap();
 
-        let serialized = bincode::serialize(&txd).unwrap();
-        let tx_str = base64::encode(serialized);
-        let response = state.solana.post_transaction_test(&tx_str).await.unwrap();
-
-        assert!(&response
-            .as_object()
-            .unwrap()
-            .get("result")
-            .unwrap()
-            .as_str()
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn test_create_buyxcurrency_promo() {
-        dotenv::dotenv().ok();
-        let promo_owner = parse_string_to_keypair(&std::env::var("PROMO_OWNER_KEYPAIR").unwrap());
-        let platform_signer =
-            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
-
-        let group_seed = parse_string_to_keypair(&std::env::var("GROUP_SEED_KEYPAIR").unwrap());
-
-        let (group, _) = find_group_address(&group_seed.pubkey());
-
-        // This test requires a local validator to be running. Whereas the other tests return prepared
-        // transactions, this one sends a transaction to create a Promo on chain.
-        if let Ok(_) = TcpListener::bind("127.0.0.1:8899".parse::<SocketAddr>().unwrap()) {
-            assert!(false, "localnet validator not started")
-        }
-
-        let state = State::new(
-            Cluster::Localnet,
-            Pubkey::from_str(PLATFORM.into()).unwrap(),
-            Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
-            Url::from_str(DATA_URL).unwrap(),
-        );
-
-        state
-            .solana
-            .request_airdrop(promo_owner.pubkey().to_string(), 1_000_000_000)
-            .await
-            .unwrap();
-
-        state
-            .solana
-            .request_airdrop(group.to_string(), 1_000_000_000)
-            .await
-            .unwrap();
-
-        let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        tokio::spawn(async move {
-            axum::Server::from_tcp(listener)
-                .unwrap()
-                .serve(
-                    create_app(
-                        Cluster::Localnet,
-                        Pubkey::from_str(PLATFORM.into()).unwrap(),
-                        platform_signer,
-                        Url::from_str(DATA_URL).unwrap(),
-                    )
-                    .into_make_service(),
-                )
-                .await
-                .unwrap();
-        });
-
-        let file_path = "./tests/fixtures/bokoup_logo_3.jpg";
-        let file = fs::read(file_path).await.unwrap();
-
-        let content_type = if let Some(content_type) = mime_guess::from_path(file_path).first() {
-            content_type.to_string()
-        } else {
-            mime_guess::mime::OCTET_STREAM.to_string()
-        };
-
-        let metadata_data = serde_json::json!({
-            "name": "buyXCurrency",
-            "symbol": "CURR",
-            "description": "bokoup test promo - currency",
-            "attributes": [
-                {
-                    "trait_type": "promoType",
-                    "value": "buyXCurrencyGetYPercent",
-                },
-                {
-                    "trait_type": "buyXCurrency",
-                    "value": 200,
-                },
-                {
-                    "trait_type": "getYPercent",
-                    "value": 10
-                },
-                {  "trait_type": "maxMint",
-                    "value": 1000,
-                },
-                {
-                    "trait_type": "maxBurn",
-                    "value": 500,
-                },
-            ],
-            "collection": {
-                "name": "Currency Promo",
-                "family": "Test Merchant Promos"
-            }
-        });
-
-        let form = reqwest::multipart::Form::new()
-            .part(
-                "metadata",
-                reqwest::multipart::Part::text(metadata_data.to_string())
-                    .mime_str("application/json")
-                    .unwrap(),
-            )
-            .part(
-                "image",
-                reqwest::multipart::Part::bytes(file)
-                    .file_name(file_path.split("/").last().unwrap())
-                    .mime_str(&content_type)
-                    .unwrap(),
-            );
-
-        let memo =
-            serde_json::json!({"reference": "tester", "memo": "have a great day"}).to_string();
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!(
-                "http://{}/promo/create/{}/{}/{}",
-                addr,
-                promo_owner.pubkey(),
-                group_seed.pubkey().to_string(),
-                memo,
-            ))
-            .multipart(form)
-            .send()
-            .await
-            .unwrap()
-            .json::<PayResponse>()
-            .await
-            .unwrap();
-
-        let mut txd: Transaction =
-            bincode::deserialize(&base64::decode::<String>(response.transaction.clone()).unwrap())
-                .unwrap();
-
-        txd.try_partial_sign(&[&promo_owner], txd.message.recent_blockhash)
-            .unwrap();
-
-        let serialized = bincode::serialize(&txd).unwrap();
-        let tx_str = base64::encode(serialized);
-        let response = state.solana.post_transaction_test(&tx_str).await.unwrap();
-
-        assert!(&response
-            .as_object()
-            .unwrap()
-            .get("result")
-            .unwrap()
-            .as_str()
-            .is_some());
+        assert_eq!(instruction.metadata_data.name, "buyXProduct".to_string());
     }
 }

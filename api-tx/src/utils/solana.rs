@@ -10,21 +10,24 @@ use anchor_lang::{
 use bpl_token_metadata::{
     accounts::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_accounts,
-        CreatePromo as create_promo_accounts, CreatePromoGroup as create_promo_group_accounts,
-        DelegatePromoToken as delegate_promo_token_accounts,
+        CreateCampaign as create_campaign_accounts, CreateDevice as create_device_accounts,
+        CreateLocation as create_location_accounts, CreateMerchant as create_merchant_accounts,
+        CreatePromo as create_promo_accounts, DelegatePromoToken as delegate_promo_token_accounts,
         MintPromoToken as mint_promo_token_accounts, SignMemo as sign_memo_accounts,
     },
     instruction::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_instruction,
-        CreatePromo as create_promo_instruction,
-        CreatePromoGroup as create_promo_group_instruction,
+        CreateCampaign as create_campaign_instruction, CreateDevice as create_device_instruction,
+        CreateLocation as create_location_instruction,
+        CreateMerchant as create_merchant_instruction, CreatePromo as create_promo_instruction,
         DelegatePromoToken as delegate_promo_token_instruction,
         MintPromoToken as mint_promo_token_instruction, SignMemo as sign_memo_instruction,
     },
-    state::{Campaign, DataV2, Promo},
+    state::{Campaign, DataV2, Device, Location, Merchant, Promo},
     utils::{
         find_admin_address, find_associated_token_address, find_authority_address,
-        find_group_address, find_metadata_address, find_promo_address,
+        find_campaign_address, find_device_address, find_location_address, find_merchant_address,
+        find_metadata_address, find_promo_address,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -33,36 +36,147 @@ use serde_json::{json, Value};
 use solana_sdk::{commitment_config::CommitmentLevel, hash::Hash};
 use std::str::FromStr;
 
-pub fn create_create_promo_group_instruction(
+pub fn create_merchant_instruction(
     payer: Pubkey,
-    group_seed: Pubkey,
-    members: Vec<Pubkey>,
-    lamports: u64,
+    name: String,
+    uri: String,
+    active: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    if !members.contains(&payer) {
-        return Err(AppError::PayerNotInMembers);
-    }
+    let merchant = find_merchant_address(&payer).0;
 
-    let (promo_group, nonce) = find_group_address(&group_seed);
-
-    let data = Campaign {
+    let data = Merchant {
         owner: payer,
-        seed: group_seed,
-        nonce,
-        members,
+        name,
+        uri,
+        active,
     };
 
-    let accounts = create_promo_group_accounts {
+    let accounts = create_merchant_accounts {
         payer,
-        seed: group_seed,
-        promo_group,
+        merchant,
+        memo_program: spl_memo::ID,
+        rent: sysvar::rent::id(),
+        system_program: system_program::ID,
+    }
+    .to_account_metas(Some(true));
+
+    let data = create_merchant_instruction { data, memo }.data();
+
+    Ok(Instruction {
+        program_id: bpl_token_metadata::id(),
+        accounts,
+        data,
+    })
+}
+
+pub fn create_location_instruction(
+    payer: Pubkey,
+    name: String,
+    uri: String,
+    active: bool,
+    memo: Option<String>,
+) -> Result<Instruction, AppError> {
+    let (merchant, _) = find_merchant_address(&payer);
+    let (location, _) = find_location_address(&payer, &name);
+
+    let data = Location {
+        merchant,
+        name,
+        uri,
+        active,
+    };
+
+    let accounts = create_location_accounts {
+        payer,
+        merchant,
+        location,
+        memo_program: spl_memo::ID,
+        rent: sysvar::rent::id(),
+        system_program: system_program::ID,
+    }
+    .to_account_metas(Some(true));
+
+    let data = create_location_instruction { data, memo }.data();
+
+    Ok(Instruction {
+        program_id: bpl_token_metadata::id(),
+        accounts,
+        data,
+    })
+}
+
+pub fn create_device_instruction(
+    payer: Pubkey,
+    location: Pubkey,
+    owner: Pubkey,
+    name: String,
+    uri: String,
+    active: bool,
+    memo: Option<String>,
+) -> Result<Instruction, AppError> {
+    let (merchant, _) = find_merchant_address(&payer);
+    let (device, _) = find_device_address(&location, &name);
+
+    let data = Device {
+        owner,
+        location,
+        name,
+        uri,
+        active,
+    };
+
+    let accounts = create_device_accounts {
+        payer,
+        merchant,
+        location,
+        device,
+        memo_program: spl_memo::ID,
+        rent: sysvar::rent::id(),
+        system_program: system_program::ID,
+    }
+    .to_account_metas(Some(true));
+
+    let data = create_device_instruction { data, memo }.data();
+
+    Ok(Instruction {
+        program_id: bpl_token_metadata::id(),
+        accounts,
+        data,
+    })
+}
+
+pub fn create_campaign_instruction(
+    payer: Pubkey,
+    name: String,
+    uri: String,
+    locations: Vec<Pubkey>,
+    lamports: u64,
+    active: bool,
+    memo: Option<String>,
+) -> Result<Instruction, AppError> {
+    let (merchant, _) = find_merchant_address(&payer);
+
+    let (campaign, _) = find_campaign_address(&merchant, &name);
+
+    let data = Campaign {
+        merchant,
+        name,
+        uri,
+        locations,
+        active,
+    };
+
+    let accounts = create_campaign_accounts {
+        payer,
+        merchant,
+        campaign,
         memo_program: spl_memo::ID,
         system_program: system_program::ID,
     }
     .to_account_metas(Some(true));
 
-    let data = create_promo_group_instruction {
+    let data = create_campaign_instruction {
         data,
         lamports,
         memo,
@@ -78,7 +192,7 @@ pub fn create_create_promo_group_instruction(
 
 pub fn create_create_promo_instruction(
     payer: Pubkey,
-    group_seed: Pubkey,
+    campaign: Pubkey,
     mint: Pubkey,
     platform: Pubkey,
     name: String,
@@ -86,18 +200,20 @@ pub fn create_create_promo_instruction(
     uri: String,
     max_mint: Option<u32>,
     max_burn: Option<u32>,
+    active: bool,
     is_mutable: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (authority, _auth_bump) = find_authority_address();
-    let (promo, _promo_bump) = find_promo_address(&mint);
-    let (metadata, _metadata_bump) = find_metadata_address(&mint);
-    let (admin_settings, _admin_bump) = find_admin_address();
-    let (group, _group_bump) = find_group_address(&group_seed);
+    let authority = find_authority_address().0;
+    let promo = find_promo_address(&mint).0;
+    let metadata = find_metadata_address(&mint).0;
+    let admin_settings = find_admin_address().0;
+    let merchant = find_merchant_address(&payer).0;
 
     let accounts = create_promo_accounts {
         payer,
-        group,
+        merchant,
+        campaign,
         mint,
         metadata,
         authority,
@@ -113,13 +229,14 @@ pub fn create_create_promo_instruction(
     .to_account_metas(Some(true));
 
     let promo_data = Promo {
-        owner: group,
+        campaign,
         mint,
         metadata,
         mint_count: 0,
         burn_count: 0,
         max_mint,
         max_burn,
+        active,
     };
 
     let metadata_data = DataV2 {
@@ -148,19 +265,23 @@ pub fn create_create_promo_instruction(
 }
 
 pub fn create_mint_promo_instruction(
-    payer: Pubkey,
-    group: Pubkey,
+    device_owner: Pubkey,
+    location: Pubkey,
+    device: Pubkey,
+    campaign: Pubkey,
     token_owner: Pubkey,
     mint: Pubkey,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (authority, _auth_bump) = find_authority_address();
-    let (promo, _promo_bump) = find_promo_address(&mint);
+    let authority = find_authority_address().0;
+    let promo = find_promo_address(&mint).0;
     let token_account = find_associated_token_address(&token_owner, &mint);
 
     tracing::debug!(
-        payer = payer.to_string(),
-        group = group.to_string(),
+        device_owner = device_owner.to_string(),
+        location = location.to_string(),
+        device = device.to_string(),
+        campaign = campaign.to_string(),
         token_owner = token_owner.to_string(),
         token_account = token_account.to_string(),
         mint = mint.to_string(),
@@ -168,8 +289,10 @@ pub fn create_mint_promo_instruction(
     );
 
     let accounts = mint_promo_token_accounts {
-        payer,
-        group,
+        payer: device_owner,
+        location,
+        device,
+        campaign,
         token_owner,
         mint,
         authority,
@@ -194,8 +317,10 @@ pub fn create_mint_promo_instruction(
 
 pub fn create_delegate_promo_instruction(
     payer: Pubkey,
-    delegate: Pubkey,
-    group: Pubkey,
+    device_owner: Pubkey,
+    location: Pubkey,
+    device: Pubkey,
+    campaign: Pubkey,
     token_owner: Pubkey,
     mint: Pubkey,
     memo: Option<String>,
@@ -205,8 +330,10 @@ pub fn create_delegate_promo_instruction(
 
     let accounts = delegate_promo_token_accounts {
         payer,
-        delegate,
-        group,
+        device_owner,
+        location,
+        device,
+        campaign,
         token_owner,
         mint,
         promo,
@@ -227,21 +354,25 @@ pub fn create_delegate_promo_instruction(
 }
 
 pub fn create_burn_delegated_promo_instruction(
-    payer: Pubkey,
-    group: Pubkey,
-    token_owner: Pubkey,
+    device_owner: Pubkey,
+    location: Pubkey,
+    device: Pubkey,
+    campaign: Pubkey,
+    token_account: Pubkey,
     mint: Pubkey,
     platform: Pubkey,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (authority, _auth_bump) = find_authority_address();
-    let (promo, _promo_bump) = find_promo_address(&mint);
-    let (admin_settings, _admin_bump) = find_admin_address();
-    let token_account = find_associated_token_address(&token_owner, &mint);
+    let authority = find_authority_address().0;
+    let promo = find_promo_address(&mint).0;
+    let admin_settings = find_admin_address().0;
+    // let token_account = find_associated_token_address(&token_owner, &mint);
 
     let accounts = burn_delegated_promo_token_accounts {
-        payer,
-        group,
+        payer: device_owner,
+        location,
+        device,
+        campaign,
         mint,
         authority,
         promo,
@@ -349,11 +480,15 @@ impl Solana {
     }
 
     pub async fn post_transaction_test(&self, tx_str: &str) -> Result<Value, AppError> {
+        let mut config = serde_json::Map::new();
+        config.insert("encoding".to_string(), Value::String("base64".to_string()));
+        config.insert(
+            "commitment".to_string(),
+            Value::String(self.commitment.to_string()),
+        );
+
         let post_object = PostObject {
-            params: vec![
-                Value::String(tx_str.to_string()),
-                json!({"encoding": "base64"}),
-            ],
+            params: vec![Value::String(tx_str.to_string()), Value::Object(config)],
             ..Default::default()
         };
 
@@ -404,9 +539,15 @@ impl Solana {
     }
 
     pub async fn request_airdrop(&self, pubkey: String, lamports: u64) -> Result<String, AppError> {
+        let mut config = serde_json::Map::new();
+        config.insert(
+            "commitment".to_string(),
+            Value::String(self.commitment.to_string()),
+        );
+
         let post_object = PostObject {
             method: "requestAirdrop".to_string(),
-            params: vec![json!(pubkey), json!(lamports)],
+            params: vec![json!(pubkey), json!(lamports), Value::Object(config)],
             ..Default::default()
         };
 
@@ -421,6 +562,32 @@ impl Solana {
 
         println!("{}", &result);
         Ok(result["result"].as_str().unwrap().to_string())
+    }
+
+    /// Returns wallet balance.
+    pub async fn get_balance(&self, address: &Pubkey) -> Result<u64, AppError> {
+        let client = reqwest::Client::new();
+
+        let mut config = serde_json::Map::new();
+        config.insert("commitment".to_string(), json!("confirmed".to_string()));
+
+        let post_object = PostObject {
+            method: String::from("getBalance"),
+            params: vec![json!(address.to_string()), Value::Object(config)],
+            ..Default::default()
+        };
+
+        let result: Value = client
+            .post(self.cluster.url())
+            .json(&post_object)
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        let balance = result["result"]["value"].as_u64().unwrap();
+        tracing::debug!(address = address.to_string(), balance = balance);
+        Ok(balance)
     }
 }
 

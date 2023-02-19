@@ -130,59 +130,74 @@ describe('promo', () => {
       active: true,
     };
 
-    const locationName = 'Test Location';
-    const locationUri = 'https://location.example.com';
-    const deviceUri = 'https://device.example.com';
-    const campaignName = 'Test Campaign';
-    const campaignUri = 'https://campaign.example.com';
-    const deviceName = 'Test Device';
-    const lamports = 500_000_000;
     const memo = 'Created a new merchant';
 
     let tx: string = '';
-    [tx, merchant, location, device, campaign] =
-      await tokenMetadataProgramMerchantOwner.createMerchant(
-        merchantData,
-        locationName,
-        locationUri,
-        deviceOwner.publicKey,
-        deviceName,
-        deviceUri,
-        campaignName,
-        campaignUri,
-        lamports,
-        memo,
-      );
+    [tx, merchant] = await tokenMetadataProgramMerchantOwner.createMerchant(merchantData, memo);
 
-    const campaignAccountInfo =
-      await tokenMetadataProgram.program.provider.connection.getAccountInfo(campaign);
+    const merchantAccount = await tokenMetadataProgram.program.account.merchant.fetch(merchant);
 
-    expect(campaignAccountInfo?.lamports).to.equal(505240880, 'Campaign lamports incorrect.');
-
-    const [merchantAccount, locationAccount, deviceAccount, campaignAccount] = await Promise.all([
-      tokenMetadataProgram.program.account.merchant.fetch(merchant),
-      tokenMetadataProgram.program.account.location.fetch(location),
-      tokenMetadataProgram.program.account.device.fetch(device),
-      tokenMetadataProgram.program.account.campaign.fetch(campaign),
-    ]);
-
-    console.log(merchantAccount, locationAccount, deviceAccount, campaignAccount);
+    console.log(merchantAccount);
   });
 
   it('creates location', async () => {
-    const locationName = 'Test Location 2';
-    const locationUri = 'https://location.example.com';
+    const name = 'Test Location';
+    const uri = 'https://location.example.com';
     const memo = 'Created a new location';
 
-    const [_, location2] = await tokenMetadataProgramMerchantOwner.createLocation(
-      locationName,
-      locationUri,
+    let tx: string = '';
+    [tx, location] = await tokenMetadataProgramMerchantOwner.createLocation(name, uri, memo);
+
+    const account = await tokenMetadataProgram.program.account.location.fetch(location);
+
+    expect(account.name).to.equal(name);
+  });
+
+  it('creates device', async () => {
+    const name = 'Test Device';
+    const uri = 'https://device.example.com';
+    const memo = 'Created a new device';
+
+    let tx: string = '';
+    [tx, device] = await tokenMetadataProgramMerchantOwner.createDevice(
+      deviceOwner.publicKey,
+      name,
+      uri,
+      location,
       memo,
     );
 
-    const locationAccount = await tokenMetadataProgram.program.account.location.fetch(location2);
+    console.log('device', device);
 
-    expect(locationAccount.name).to.equal(locationName);
+    const account = await tokenMetadataProgram.program.account.device.fetch(device);
+
+    expect(account.name).to.equal(name);
+  });
+
+  it('creates campaign', async () => {
+    const name = 'Test Campaign';
+    const uri = 'https://campaign.example.com';
+    const memo = 'Created a new campaign';
+
+    let tx: string = '';
+    [tx, campaign] = await tokenMetadataProgramMerchantOwner.createCampaign(
+      name,
+      uri,
+      [location],
+      true,
+      500_000_000,
+      memo,
+    );
+
+    const account = await tokenMetadataProgram.program.account.campaign.fetch(campaign);
+
+    expect(account.name).to.equal(name);
+
+    const accountInfo = await tokenMetadataProgram.program.account.campaign.getAccountInfo(
+      campaign,
+    );
+
+    expect(accountInfo?.lamports).to.equal(505240880);
   });
 
   it('transfers cpi', async () => {

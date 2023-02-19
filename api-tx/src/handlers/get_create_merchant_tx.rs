@@ -1,9 +1,9 @@
 use crate::{
     error::AppError,
     utils::{
-        bundlr::{upload_image, upload_metadata_json},
-        multipart::{get_metadata, get_promo_args},
-        solana::create_create_promo_instruction,
+        bundlr::{update_metadata_json, upload_image, upload_metadata_json},
+        multipart::{get_args, get_metadata},
+        solana::create_merchant_instruction,
     },
     State,
 };
@@ -12,18 +12,14 @@ use axum::{
     extract::{Multipart, Path},
     Extension, Json,
 };
-use solana_sdk::{signature::Keypair, signer::Signer, transaction::Transaction};
+use solana_sdk::transaction::Transaction;
 use std::{str::FromStr, sync::Arc};
 
-use super::{PayResponse, PromoParams};
+use super::{BasicParams, PayResponse};
 
 pub async fn handler(
     multipart: Multipart,
-    Path(PromoParams {
-        payer,
-        campaign,
-        memo,
-    }): Path<PromoParams>,
+    Path(BasicParams { payer, memo }): Path<BasicParams>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
     // Parse data - json data plus optional image. If image data exists it gets
@@ -38,10 +34,8 @@ pub async fn handler(
             ))?;
 
     // Parse args.
-    let (name, symbol, max_mint, max_burn, active) = get_promo_args(metadata_data_obj)?;
+    let (name, active) = get_args(metadata_data_obj)?;
     metadata_data_obj.remove("active");
-    metadata_data_obj.remove("max_mint");
-    metadata_data_obj.remove("max_burn");
 
     // If image exists, upload to arweave and add uri to metadata.
     let state = if let Some(image_data) = image_data {
@@ -53,36 +47,21 @@ pub async fn handler(
     };
 
     // Upload metadata json to Arweave.
-    let (uri, state) = upload_metadata_json(metadata_data_obj, state).await?;
-
-    let mint_keypair = Keypair::new();
+    let uri = upload_metadata_json(metadata_data_obj, state).await?.0;
+    // let uri = "https://merchant.example.com".to_string();
 
     let payer = Pubkey::from_str(&payer)?;
-    let campaign = Pubkey::from_str(&campaign)?;
-    // Create promo instruction.
-    let ix = create_create_promo_instruction(
-        payer,
-        campaign,
-        mint_keypair.pubkey(),
-        state.platform,
-        name,
-        symbol,
-        uri,
-        max_mint,
-        max_burn,
-        active,
-        true,
-        memo,
-    )?;
 
-    let mut tx = Transaction::new_with_payer(&[ix], Some(&payer));
-    let latest_blockhash = state.solana.get_latest_blockhash().await?;
-    tx.partial_sign(&[&mint_keypair], latest_blockhash);
+    // Create merchant instruction.
+    let ix = create_merchant_instruction(payer, name, uri, active, memo)?;
+
+    let tx = Transaction::new_with_payer(&[ix], Some(&payer));
 
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);
+
     Ok(Json(PayResponse {
         transaction,
-        message: "Create promo".to_string(),
+        message: "Create merchant".to_string(),
     }))
 }

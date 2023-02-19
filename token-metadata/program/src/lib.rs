@@ -40,30 +40,28 @@ pub mod bpl_token_metadata {
     /// Creates Merchant account
     pub fn create_merchant(
         ctx: Context<CreateMerchant>,
-        merchant_data: Merchant,
-        location_data: Location,
-        device_data: Device,
-        campaign_data: Campaign,
-        lamports: u64,
+        data: Merchant,
         memo: Option<String>,
     ) -> Result<()> {
-        ctx.accounts.process(
-            merchant_data,
-            location_data,
-            device_data,
-            campaign_data,
-            lamports,
-            memo,
-        )
+        ctx.accounts.process(data, memo)
     }
 
     /// Creates Location account
     pub fn create_location(
         ctx: Context<CreateLocation>,
-        location_data: Location,
+        data: Location,
         memo: Option<String>,
     ) -> Result<()> {
-        ctx.accounts.process(location_data, memo)
+        ctx.accounts.process(data, memo)
+    }
+
+    /// Creates Device account
+    pub fn create_device(
+        ctx: Context<CreateDevice>,
+        data: Device,
+        memo: Option<String>,
+    ) -> Result<()> {
+        ctx.accounts.process(data, memo)
     }
 
     /// Creates Group account used to grant transaction execution permissions to
@@ -171,7 +169,7 @@ pub struct CreateAdminSettings<'info> {
 /// Accounts related to creating [Merchant].
 ///
 #[derive(Accounts, Clone)]
-#[instruction(merchant_data: Merchant, location_data: Location, device_data: Device, campaign_data: Campaign)]
+#[instruction(merchant_data: Merchant)]
 pub struct CreateMerchant<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -186,45 +184,15 @@ pub struct CreateMerchant<'info> {
         space = Merchant::LEN
     )]
     pub merchant: Account<'info, Merchant>,
-    #[account(
-        init,
-        constraint = location_data.merchant == merchant.key(),
-        constraint = location_data.name.len() <= MAX_NAME_LENGTH,
-        constraint = location_data.uri.len() <= MAX_URI_LENGTH,
-        seeds = [LOCATION_PREFIX.as_bytes(), merchant.key().as_ref(), location_data.name.as_bytes()], bump,
-        payer = payer,
-        space = Location::LEN
-    )]
-    pub location: Account<'info, Location>,
-    #[account(
-        init,
-        constraint = device_data.location == location.key(),
-        constraint = device_data.name.len() <= MAX_NAME_LENGTH,
-        constraint = device_data.uri.len() <= MAX_URI_LENGTH,
-        seeds = [DEVICE_PREFIX.as_bytes(), location.key().as_ref(), device_data.name.as_bytes()], bump,
-        payer = payer,
-        space = Device::LEN
-    )]
-    pub device: Account<'info, Device>,
-    #[account(
-        init,
-        constraint = campaign_data.merchant == merchant.key(),
-        constraint = campaign_data.locations.len() <= LOCATIONS_CAPACITY as usize,
-        constraint = campaign_data.name.len() <= MAX_NAME_LENGTH,
-        seeds = [CAMPAIGN_PREFIX.as_bytes(), merchant.key().as_ref(), campaign_data.name.as_bytes()], bump,
-        payer = payer,
-        space = Campaign::LEN
-    )]
-    pub campaign: Account<'info, Campaign>,
     pub memo_program: Program<'info, SplMemo>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
 }
 
-/// Accounts related to creating [Merchant].
+/// Accounts related to creating [Location].
 ///
 #[derive(Accounts, Clone)]
-#[instruction(location_data: Location)]
+#[instruction(data: Location)]
 pub struct CreateLocation<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -236,14 +204,43 @@ pub struct CreateLocation<'info> {
     pub merchant: Account<'info, Merchant>,
     #[account(
         init,
-        constraint = location_data.merchant == merchant.key(),
-        constraint = location_data.name.len() <= MAX_NAME_LENGTH,
-        constraint = location_data.uri.len() <= MAX_URI_LENGTH,
-        seeds = [LOCATION_PREFIX.as_bytes(), merchant.key().as_ref(), location_data.name.as_bytes()], bump,
+        constraint = data.merchant == merchant.key(),
+        constraint = data.name.len() <= MAX_NAME_LENGTH,
+        constraint = data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [LOCATION_PREFIX.as_bytes(), merchant.key().as_ref(), data.name.as_bytes()], bump,
         payer = payer,
         space = Location::LEN
     )]
     pub location: Account<'info, Location>,
+    pub memo_program: Program<'info, SplMemo>,
+    pub rent: Sysvar<'info, Rent>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts related to creating [Merchant].
+///
+#[derive(Accounts, Clone)]
+#[instruction(data: Device)]
+pub struct CreateDevice<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(
+        constraint = merchant.owner == payer.key(),
+        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+    )]
+    pub merchant: Account<'info, Merchant>,
+    #[account(constraint = location.merchant == merchant.key())]
+    pub location: Account<'info, Location>,
+    #[account(
+        init,
+        constraint = data.location == location.key(),
+        constraint = data.name.len() <= MAX_NAME_LENGTH,
+        constraint = data.uri.len() <= MAX_URI_LENGTH,
+        seeds = [DEVICE_PREFIX.as_bytes(), location.key().as_ref(), data.name.as_bytes()], bump,
+        payer = payer,
+        space = Device::LEN
+    )]
+    pub device: Account<'info, Device>,
     pub memo_program: Program<'info, SplMemo>,
     pub rent: Sysvar<'info, Rent>,
     pub system_program: Program<'info, System>,
@@ -377,7 +374,7 @@ pub struct TransferCpi<'info> {
 /// No platform fees result from minting a token.
 #[derive(Accounts, Clone)]
 pub struct MintPromoToken<'info> {
-    #[account(mut)]
+    #[account(mut, constraint = device.owner == payer.key())]
     pub payer: Signer<'info>,
     #[account(mut, constraint = campaign.locations.contains(&location.key()))]
     pub location: Account<'info, Location>,
@@ -424,7 +421,7 @@ pub struct MintPromoToken<'info> {
 pub struct DelegatePromoToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    /// CHECK: checked via group constraints
+    /// CHECK: checked via device constraints
     pub device_owner: UncheckedAccount<'info>,
     #[account(mut, constraint = campaign.locations.contains(&location.key()))]
     pub location: Account<'info, Location>,
