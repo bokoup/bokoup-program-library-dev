@@ -2,6 +2,15 @@ table:
   name: promo
   schema: public
 object_relationships:
+  - name: campaignObject
+    using:
+      manual_configuration:
+        column_mapping:
+          campaign: id
+        insertion_order: null
+        remote_table:
+          name: campaign
+          schema: public
   - name: groupObject
     using:
       manual_configuration:

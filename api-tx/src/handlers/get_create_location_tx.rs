@@ -1,7 +1,7 @@
 use crate::{
     error::AppError,
     utils::{
-        bundlr::{update_metadata_json, upload_image, upload_metadata_json},
+        bundlr::{upload_image, upload_metadata_json},
         multipart::{get_args, get_metadata},
         solana::create_location_instruction,
     },

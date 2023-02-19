@@ -580,11 +580,6 @@ pub mod test {
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
-        let txd: Transaction = bincode::deserialize(
-            &base64::decode::<String>(parsed_response.transaction.clone()).unwrap(),
-        )
-        .unwrap();
-
         let instruction = create_burn_delegated_promo_instruction(
             device_owner,
             location,

@@ -1,0 +1,13 @@
+table:
+  name: campaign
+  schema: public
+array_relationships:
+  - name: promos
+    using:
+      manual_configuration:
+        column_mapping:
+          id: campaign
+        insertion_order: null
+        remote_table:
+          name: promo
+          schema: public

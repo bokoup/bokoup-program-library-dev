@@ -1,0 +1,13 @@
+table:
+  name: device
+  schema: public
+object_relationships:
+  - name: locationObject
+    using:
+      manual_configuration:
+        column_mapping:
+          location: id
+        insertion_order: null
+        remote_table:
+          name: location
+          schema: public

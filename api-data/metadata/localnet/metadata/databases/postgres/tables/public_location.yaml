@@ -1,0 +1,13 @@
+table:
+  name: location
+  schema: public
+object_relationships:
+  - name: merchantObject
+    using:
+      manual_configuration:
+        column_mapping:
+          merchant: id
+        insertion_order: null
+        remote_table:
+          name: merchant
+          schema: public

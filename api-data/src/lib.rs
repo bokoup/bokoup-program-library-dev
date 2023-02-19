@@ -469,6 +469,11 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
+        } else if table == "create_merchant" {
+            queries::bpl_token_metadata::create_merchant::upsert(
+                client, signature, accounts, data, slot,
+            )
+            .await;
         } else if table == "create_location" {
             queries::bpl_token_metadata::create_location::upsert(
                 client, signature, accounts, data, slot,
@@ -529,6 +534,7 @@ mod tests {
         let accounts: Vec<Pubkey> = (0..12).map(|_| Pubkey::new_unique()).collect();
 
         for table in vec![
+            "create_merchant",
             "create_location",
             "create_device",
             "create_campaign",

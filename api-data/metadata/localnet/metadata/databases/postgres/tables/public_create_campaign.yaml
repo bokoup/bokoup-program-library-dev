@@ -1,0 +1,3 @@
+table:
+  name: create_campaign
+  schema: public

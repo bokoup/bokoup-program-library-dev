@@ -1,0 +1,22 @@
+table:
+  name: merchant
+  schema: public
+array_relationships:
+  - name: campaigns
+    using:
+      manual_configuration:
+        column_mapping:
+          id: merchant
+        insertion_order: null
+        remote_table:
+          name: campaign
+          schema: public
+  - name: locations
+    using:
+      manual_configuration:
+        column_mapping:
+          id: merchant
+        insertion_order: null
+        remote_table:
+          name: location
+          schema: public

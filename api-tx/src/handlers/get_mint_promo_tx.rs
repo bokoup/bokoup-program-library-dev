@@ -1,15 +1,10 @@
 use super::PayResponse;
-use crate::{
-    error::AppError, handlers::MintParams, utils::solana::create_mint_promo_instruction, State,
-};
+use crate::{error::AppError, handlers::MintParams, utils::solana::create_mint_promo_instruction};
 use anchor_lang::prelude::Pubkey;
-use axum::{
-    extract::{Extension, Path},
-    Json,
-};
+use axum::{extract::Path, Json};
 use serde::{Deserialize, Serialize};
-use solana_sdk::{signer::Signer, transaction::Transaction};
-use std::{str::FromStr, sync::Arc};
+use solana_sdk::transaction::Transaction;
+use std::str::FromStr;
 
 pub async fn handler(
     Json(data): Json<Data>,
@@ -22,7 +17,6 @@ pub async fn handler(
         message,
         memo,
     }): Path<MintParams>,
-    Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(
         mint = mint,

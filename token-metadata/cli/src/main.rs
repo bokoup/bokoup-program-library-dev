@@ -79,7 +79,7 @@ enum Commands {
         campaign_name: String
     },
     InstructionDiscriminator {
-        #[clap(long)]
+        #[clap(index=1)]
         name: String
     }
 }
