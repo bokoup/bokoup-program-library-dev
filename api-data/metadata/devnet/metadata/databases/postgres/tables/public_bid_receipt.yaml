@@ -1,6 +1,16 @@
 table:
   name: bid_receipt
   schema: public
+object_relationships:
+  - name: metadataObject
+    using:
+      manual_configuration:
+        column_mapping:
+          metadata: id
+        insertion_order: null
+        remote_table:
+          name: metadata
+          schema: public
 select_permissions:
   - role: public
     permission:

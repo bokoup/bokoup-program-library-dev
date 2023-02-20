@@ -37,11 +37,13 @@ select_permissions:
         - memo
         - admin_settings
         - authority
+        - campaign
+        - device
+        - location
         - mint
         - payer
         - platform
         - promo
-        - promo_group
         - signature
         - token_account
         - created_at

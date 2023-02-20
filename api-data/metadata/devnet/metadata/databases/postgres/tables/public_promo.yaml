@@ -2,14 +2,14 @@ table:
   name: promo
   schema: public
 object_relationships:
-  - name: groupObject
+  - name: campaignObject
     using:
       manual_configuration:
         column_mapping:
-          owner: id
+          campaign: id
         insertion_order: null
         remote_table:
-          name: promo_group
+          name: campaign
           schema: public
   - name: metadataObject
     using:
@@ -33,16 +33,17 @@ select_permissions:
   - role: public
     permission:
       columns:
-        - id
-        - owner
-        - mint
-        - metadata
-        - mint_count
-        - burn_count
-        - max_mint
-        - max_burn
         - slot
         - write_version
+        - active
+        - burn_count
+        - max_burn
+        - max_mint
+        - mint_count
+        - campaign
+        - id
+        - metadata
+        - mint
         - created_at
         - modified_at
       filter: {}

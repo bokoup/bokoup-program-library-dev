@@ -24,16 +24,18 @@ select_permissions:
   - role: public
     permission:
       columns:
-        - signature
-        - transaction_type
-        - payer
-        - promo_group
-        - mint
-        - authority
-        - promo
-        - token_account
-        - memo
         - slot
+        - memo
+        - authority
+        - campaign
+        - device
+        - location
+        - mint
+        - payer
+        - promo
+        - signature
+        - token_account
+        - transaction_type
         - created_at
         - modified_at
       filter: {}

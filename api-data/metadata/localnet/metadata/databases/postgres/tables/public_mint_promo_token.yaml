@@ -30,7 +30,6 @@ select_permissions:
         - mint
         - payer
         - promo
-        - promo_group
         - signature
         - token_account
         - token_owner
