@@ -84,7 +84,7 @@ cp /home/ubuntu/geyser-plugin-nats/target/release/libgeyser_plugin_nats.so /home
 echo '{
     "libpath": "/home/sol/libgeyser_plugin_nats.so",
     "addresses": [
-        "CjSoZrc2DBZTv1UdoMx8fTcCpqEMXCyfm2EuTwy8yiGi",
+        "HB53jiCac5VtNdokJeibrfd1QJsyWWFe56M1TQUSKQfY",
         "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
         "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s",
         "hausS13jsjafwWwGqZTUQRmWyvyxn9EQpqMwV1PBBmk"

@@ -49,7 +49,7 @@ export class TokenMetadataProgram {
   payer: Wallet;
 
   constructor(provider: Provider) {
-    this.PUBKEY = new PublicKey('CjSoZrc2DBZTv1UdoMx8fTcCpqEMXCyfm2EuTwy8yiGi');
+    this.PUBKEY = new PublicKey('HB53jiCac5VtNdokJeibrfd1QJsyWWFe56M1TQUSKQfY');
     this.SPL_ASSOCIATED_TOKEN_ACCOUNT_PROGRAM_ID = new PublicKey(
       'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL',
     );

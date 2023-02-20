@@ -17,7 +17,7 @@ use utils::{
     LOCATION_PREFIX, MAX_NAME_LENGTH, MAX_URI_LENGTH, MERCHANT_PREFIX, PROMO_PREFIX,
 };
 
-declare_id!("CjSoZrc2DBZTv1UdoMx8fTcCpqEMXCyfm2EuTwy8yiGi");
+declare_id!("HB53jiCac5VtNdokJeibrfd1QJsyWWFe56M1TQUSKQfY");
 
 // also update:
 // Anchor.toml
