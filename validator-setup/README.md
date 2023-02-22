@@ -19,7 +19,8 @@ Need to install build-essentials pkg-config libssl-dev
 
 ### update
 
-1. Pull `bokoup-program-library` and `geyser-plugin-nats` repos - make sure remote url is set to the right upstream repo; git@github.com:bokoup/bokoup-program-library-def.git
+1. Pull `bokoup-program-library` and `geyser-plugin-nats` repos - make sure remote url is set to the
+   right upstream repo; git@github.com:bokoup/bokoup-program-library-def.git
 1. `cargo-build --release` in each
 1. `sudo systemctl stop bpl-indexer`
 1. `sudo systemctl stop sol`
@@ -54,6 +55,14 @@ No new snapshots are downloaded if ledger is up to date, but take 5 to 10 minute
 and catch back up.
 
 ## diagnostics
+
 ```
 curl -sL yabs.sh | bash -s — -ig
+```
+
+## Set the scaling governor on the highest performance settings
+
+```
+echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 ```
