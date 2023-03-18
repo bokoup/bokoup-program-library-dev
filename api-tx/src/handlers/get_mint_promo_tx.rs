@@ -1,5 +1,5 @@
 use super::PayResponse;
-use crate::{error::AppError, handlers::MintParams, utils::solana::create_mint_promo_instruction};
+use crate::{error::AppError, handlers::MintParams, utils::solana::mint_promo_instruction};
 use anchor_lang::prelude::Pubkey;
 use axum::{extract::Path, Json};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub async fn handler(
     let campaign = Pubkey::from_str(&campaign)?;
     let token_owner = Pubkey::from_str(&token_owner)?;
 
-    let instruction = create_mint_promo_instruction(
+    let instruction = mint_promo_instruction(
         device_owner,
         location,
         device,

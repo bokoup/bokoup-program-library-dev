@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use solana_sdk::transaction::Transaction;
 use std::{str::FromStr, sync::Arc};
 
-use crate::{error::AppError, utils::solana::create_burn_delegated_promo_instruction, State};
+use crate::{error::AppError, utils::solana::burn_delegated_promo_instruction, State};
 
 use super::{BurnDelegatedParams, PayResponse};
 
@@ -32,7 +32,7 @@ pub async fn handler(
     let campaign = Pubkey::from_str(&campaign)?;
     let platform = state.platform;
 
-    let instruction = create_burn_delegated_promo_instruction(
+    let instruction = burn_delegated_promo_instruction(
         device_owner,
         location,
         device,

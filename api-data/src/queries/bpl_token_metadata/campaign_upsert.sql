@@ -3,17 +3,19 @@ INSERT INTO campaign (
     merchant,
     name,
     uri,
+    metadata_json,
     locations,
     active,
     slot,
     write_version
 )
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT ON CONSTRAINT campaign_pkey DO UPDATE 
     SET
         merchant = EXCLUDED.merchant,
         name = EXCLUDED.name,
         uri = EXCLUDED.uri,
+        metadata_json = EXCLUDED.metadata_json,
         locations = EXCLUDED.locations,
         active = EXCLUDED.active,
         slot = EXCLUDED.slot,

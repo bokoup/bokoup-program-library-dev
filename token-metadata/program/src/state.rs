@@ -75,7 +75,7 @@ impl Location {
 // Device
 //==============================
 
-// name must be unique: address is is pda of merchant address and name string
+// name must be unique: address is is pda of location address and name string
 // going to include physical address in metadata
 // can also include reference, i.e. location number in metadata
 // owner is the pubkey address of the keypair on the device

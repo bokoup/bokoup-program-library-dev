@@ -38,15 +38,16 @@ use std::str::FromStr;
 
 pub fn create_merchant_instruction(
     payer: Pubkey,
+    owner: Pubkey,
     name: String,
     uri: String,
     active: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let merchant = find_merchant_address(&payer).0;
+    let merchant = find_merchant_address(&owner).0;
 
     let data = Merchant {
-        owner: payer,
+        owner,
         name,
         uri,
         active,
@@ -54,6 +55,7 @@ pub fn create_merchant_instruction(
 
     let accounts = create_merchant_accounts {
         payer,
+        owner,
         merchant,
         memo_program: spl_memo::ID,
         rent: sysvar::rent::id(),
@@ -72,13 +74,14 @@ pub fn create_merchant_instruction(
 
 pub fn create_location_instruction(
     payer: Pubkey,
+    owner: Pubkey,
     name: String,
     uri: String,
     active: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (merchant, _) = find_merchant_address(&payer);
-    let (location, _) = find_location_address(&payer, &name);
+    let (merchant, _) = find_merchant_address(&owner);
+    let (location, _) = find_location_address(&owner, &name);
 
     let data = Location {
         merchant,
@@ -89,6 +92,7 @@ pub fn create_location_instruction(
 
     let accounts = create_location_accounts {
         payer,
+        owner,
         merchant,
         location,
         memo_program: spl_memo::ID,
@@ -108,6 +112,7 @@ pub fn create_location_instruction(
 
 pub fn create_device_instruction(
     payer: Pubkey,
+    merchant_owner: Pubkey,
     location: Pubkey,
     owner: Pubkey,
     name: String,
@@ -115,7 +120,7 @@ pub fn create_device_instruction(
     active: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (merchant, _) = find_merchant_address(&payer);
+    let (merchant, _) = find_merchant_address(&merchant_owner);
     let (device, _) = find_device_address(&location, &name);
 
     let data = Device {
@@ -128,6 +133,7 @@ pub fn create_device_instruction(
 
     let accounts = create_device_accounts {
         payer,
+        merchant_owner,
         merchant,
         location,
         device,
@@ -148,6 +154,7 @@ pub fn create_device_instruction(
 
 pub fn create_campaign_instruction(
     payer: Pubkey,
+    owner: Pubkey,
     name: String,
     uri: String,
     locations: Vec<Pubkey>,
@@ -155,7 +162,7 @@ pub fn create_campaign_instruction(
     active: bool,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (merchant, _) = find_merchant_address(&payer);
+    let (merchant, _) = find_merchant_address(&owner);
 
     let (campaign, _) = find_campaign_address(&merchant, &name);
 
@@ -169,6 +176,7 @@ pub fn create_campaign_instruction(
 
     let accounts = create_campaign_accounts {
         payer,
+        owner,
         merchant,
         campaign,
         memo_program: spl_memo::ID,
@@ -190,7 +198,7 @@ pub fn create_campaign_instruction(
     })
 }
 
-pub fn create_create_promo_instruction(
+pub fn create_promo_instruction(
     payer: Pubkey,
     campaign: Pubkey,
     mint: Pubkey,
@@ -264,7 +272,7 @@ pub fn create_create_promo_instruction(
     })
 }
 
-pub fn create_mint_promo_instruction(
+pub fn mint_promo_instruction(
     device_owner: Pubkey,
     location: Pubkey,
     device: Pubkey,
@@ -315,7 +323,7 @@ pub fn create_mint_promo_instruction(
     })
 }
 
-pub fn create_delegate_promo_instruction(
+pub fn delegate_promo_instruction(
     payer: Pubkey,
     device_owner: Pubkey,
     location: Pubkey,
@@ -353,7 +361,7 @@ pub fn create_delegate_promo_instruction(
     })
 }
 
-pub fn create_burn_delegated_promo_instruction(
+pub fn burn_delegated_promo_instruction(
     device_owner: Pubkey,
     location: Pubkey,
     device: Pubkey,

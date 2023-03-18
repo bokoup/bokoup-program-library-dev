@@ -9,7 +9,7 @@ impl<'info> CreateMerchant<'info> {
         *self.merchant = data;
 
         if let Some(memo) = memo {
-            let account_infos = vec![self.payer.to_account_info()];
+            let account_infos = vec![self.owner.to_account_info(), self.payer.to_account_info()];
             create_memo(memo, account_infos)?;
         }
         Ok(())

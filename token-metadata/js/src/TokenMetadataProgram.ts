@@ -107,21 +107,29 @@ export class TokenMetadataProgram {
     return adminSettings;
   }
 
-  async createMerchant(merchantData: Merchant, memo: string | null): Promise<[string, PublicKey]> {
+  async createMerchant(
+    merchantData: Merchant,
+    payer: Keypair,
+    memo: string | null,
+  ): Promise<[string, PublicKey]> {
     const merchant = this.findMerchantAddress(merchantData.owner);
 
     const tx = await this.program.methods
       .createMerchant(merchantData, memo)
       .accounts({
+        payer: payer.publicKey,
+        owner: this.payer.publicKey,
         merchant,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([payer])
       .rpc();
 
     return [tx, merchant];
   }
 
   async createLocation(
+    payer: Keypair,
     name: string,
     uri: string,
     memo: string | null,
@@ -139,16 +147,21 @@ export class TokenMetadataProgram {
     const tx = await this.program.methods
       .createLocation(locationData, memo)
       .accounts({
+        payer: payer.publicKey,
+        owner: this.payer.publicKey,
         merchant,
         location,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([payer])
       .rpc();
 
     return [tx, location];
   }
 
+  // owner in args in device owner, owner in accounts is merchant owner
   async createDevice(
+    payer: Keypair,
     owner: PublicKey,
     name: string,
     uri: string,
@@ -169,19 +182,23 @@ export class TokenMetadataProgram {
     const tx = await this.program.methods
       .createDevice(data, memo)
       .accounts({
+        payer: payer.publicKey,
+        merchantOwner: this.payer.publicKey,
         merchant,
         location,
         device,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([payer])
       .rpc();
 
     return [tx, device];
   }
 
   async createCampaign(
+    payer: Keypair,
     name: string,
-    uri: String,
+    uri: string,
     locations: Array<PublicKey>,
     active: boolean,
     lamports: number,
@@ -201,10 +218,13 @@ export class TokenMetadataProgram {
     const tx = await this.program.methods
       .createCampaign(campaignData, new BN(lamports), memo)
       .accounts({
+        payer: payer.publicKey,
+        owner: this.payer.publicKey,
         merchant,
         campaign,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([payer])
       .rpc();
     return [tx, campaign];
   }

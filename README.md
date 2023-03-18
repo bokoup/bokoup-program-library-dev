@@ -16,3 +16,7 @@ Complete set up for developing applications to allow merchants to issue and rede
 
 ## Illustrative Point of Sale Flow
 ![bokoup pos flow](specifications/bokoup_flows.png "bokoup Clover pos flow")
+
+## Build notes
+* indexer has to get built with rustc version 1.66
+* geyser-plugin has to get built with rust version 1.60

@@ -1,16 +1,18 @@
 INSERT INTO create_campaign (
     signature,
     payer,
+    owner,
     merchant,
     campaign,
     lamports,
     memo,
     slot
 )
-    VALUES($1, $2, $3, $4, $5, $6, $7)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT ON CONSTRAINT create_campaign_pkey DO UPDATE 
     SET
         payer = EXCLUDED.payer,
+        owner = EXCLUDED.owner,
         merchant = EXCLUDED.merchant,
         campaign = EXCLUDED.campaign,
         lamports = EXCLUDED.lamports,

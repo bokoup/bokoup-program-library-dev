@@ -9,7 +9,10 @@ impl<'info> CreateDevice<'info> {
         *self.device = data;
 
         if let Some(memo) = memo {
-            let account_infos = vec![self.payer.to_account_info()];
+            let account_infos = vec![
+                self.merchant_owner.to_account_info(),
+                self.payer.to_account_info(),
+            ];
             create_memo(memo, account_infos)?;
         }
         Ok(())

@@ -3,7 +3,7 @@ use crate::{
     utils::{
         bundlr::{upload_image, upload_metadata_json},
         multipart::{get_metadata, get_promo_args},
-        solana::create_create_promo_instruction,
+        solana::create_promo_instruction,
     },
     State,
 };
@@ -60,7 +60,7 @@ pub async fn handler(
     let payer = Pubkey::from_str(&payer)?;
     let campaign = Pubkey::from_str(&campaign)?;
     // Create promo instruction.
-    let ix = create_create_promo_instruction(
+    let ix = create_promo_instruction(
         payer,
         campaign,
         mint_keypair.pubkey(),

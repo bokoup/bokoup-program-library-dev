@@ -58,6 +58,7 @@ CREATE TABLE public.campaign (
     name text NOT NULL,
     uri text NOT NULL,
     locations jsonb NOT NULL,
+    metadata_json jsonb,
     active boolean NOT NULL,
     slot bigint NOT NULL,
     write_version bigint NOT NULL,
@@ -88,6 +89,7 @@ ALTER TABLE ONLY public.promo
 CREATE TABLE public.create_merchant (
     signature text NOT NULL,
     payer text NOT NULL,
+    owner text NOT NULL,
     merchant text NOT NULL,
     memo jsonb,
     slot bigint NOT NULL,
@@ -113,6 +115,7 @@ ALTER TABLE ONLY public.create_location
 CREATE TABLE public.create_device (
     signature text NOT NULL,
     payer text NOT NULL,
+    merchant_owner text NOT NULL,
     merchant text NOT NULL,
     location text NOT NULL,
     device text NOT NULL,
@@ -127,6 +130,7 @@ ALTER TABLE ONLY public.create_device
 CREATE TABLE public.create_campaign (
     signature text NOT NULL,
     payer text NOT NULL,
+    owner text NOT NULL,
     merchant text NOT NULL,
     campaign text NOT NULL,
     lamports bigint NOT NULL,

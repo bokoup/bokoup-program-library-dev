@@ -8,8 +8,7 @@ use solana_sdk::{signer::Signer, transaction::Transaction};
 use std::{str::FromStr, sync::Arc};
 
 use crate::{
-    error::AppError, handlers::DelegateParams, utils::solana::create_delegate_promo_instruction,
-    State,
+    error::AppError, handlers::DelegateParams, utils::solana::delegate_promo_instruction, State,
 };
 
 use super::PayResponse;
@@ -36,7 +35,7 @@ pub async fn handler(
     let device = Pubkey::from_str(&device)?;
     let campaign = Pubkey::from_str(&campaign)?;
 
-    let instruction = create_delegate_promo_instruction(
+    let instruction = delegate_promo_instruction(
         payer,
         device_owner,
         location,

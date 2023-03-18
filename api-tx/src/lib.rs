@@ -127,31 +127,31 @@ pub fn create_app(
             get(get_app_id::handler).post(get_sign_memo_tx::handler),
         )
         .route(
-            "/merchant/create/:payer",
+            "/merchant/create/:owner",
             get(get_app_id::handler).post(get_create_merchant_tx::handler),
         )
         .route(
-            "/merchant/create/:payer/:memo",
+            "/merchant/create/:owner/:memo",
             get(get_app_id::handler).post(get_create_merchant_tx::handler),
         )
         .route(
-            "/location/create/:payer",
+            "/location/create/:owner",
             get(get_app_id::handler).post(get_create_location_tx::handler),
         )
         .route(
-            "/location/create/:payer/:memo",
+            "/location/create/:owner/:memo",
             get(get_app_id::handler).post(get_create_location_tx::handler),
         )
         .route(
-            "/device/create/:payer/:location/:owner/",
+            "/device/create/:merchant_owner/:location/:owner/",
             get(get_app_id::handler).post(get_create_device_tx::handler),
         )
         .route(
-            "/device/create/:payer/:location/:owner/:memo",
+            "/device/create/:merchant_owner/:location/:owner/:memo",
             get(get_app_id::handler).post(get_create_device_tx::handler),
         )
         .route(
-            "/campaign/create/:payer/:lamports/:memo/*locations",
+            "/campaign/create/:owner/:lamports/:memo/*locations",
             get(get_app_id::handler).post(get_create_campaign_tx::handler),
         )
         .layer(
@@ -200,102 +200,21 @@ pub mod test {
         body::Body,
         http::{Method, Request, StatusCode},
     };
-    use bpl_token_metadata::{
-        state::Merchant,
-        utils::{find_campaign_address, find_location_address, find_merchant_address},
-    };
-    use futures::future::FutureExt;
+    use bpl_token_metadata::utils::{find_campaign_address, find_location_address};
     use handlers::PayResponse;
-    use solana_sdk::{
-        commitment_config::CommitmentConfig, signature::Signer, transaction::Transaction,
-    };
+    use solana_sdk::{signature::Signer, transaction::Transaction};
     use std::{
         net::{SocketAddr, TcpListener},
-        rc::Rc,
         str::FromStr,
     };
     use tokio::fs;
     use tower::ServiceExt;
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-    use utils::{data::*, solana::*};
+    use utils::solana::*;
 
     const MESSAGE: &str = "This is a really long message that tells you to do something.";
     const PLATFORM: &str = "2R7GkXvQQS4iHptUvQMhDvRSNXL8tAuuASNvCYgz3GQW";
     const DATA_URL: &str = "https://shining-sailfish-15.hasura.app/v1/graphql/";
-
-    async fn fetch_mint(url: &String) -> Pubkey {
-        let client = reqwest::Client::new();
-        let result: serde_json::Value = client
-            .post(url)
-            .json(&serde_json::json!({ "query": FIRST_MINT_QUERY }))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        tracing::debug!(result = result.to_string());
-
-        let mint_str = result
-            .as_object()
-            .unwrap()
-            .get("data")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("mint")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .get(0)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("id")
-            .unwrap()
-            .as_str()
-            .unwrap();
-
-        Pubkey::from_str(mint_str).unwrap()
-    }
-
-    async fn fetch_token_account(url: &String) -> Pubkey {
-        let client = reqwest::Client::new();
-        let result: serde_json::Value = client
-            .post(url)
-            .json(&serde_json::json!({ "query": FIRST_TOKEN_ACCOUNT_QUERY }))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        tracing::debug!(result = result.to_string());
-
-        let mint_str = result
-            .as_object()
-            .unwrap()
-            .get("data")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("tokenAccount")
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .get(0)
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .get("id")
-            .unwrap()
-            .as_str()
-            .unwrap();
-
-        Pubkey::from_str(mint_str).unwrap()
-    }
 
     #[tokio::test]
     pub async fn run_tests() {
@@ -414,7 +333,7 @@ pub mod test {
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
-        let instruction = create_mint_promo_instruction(
+        let instruction = mint_promo_instruction(
             device_owner,
             location,
             device,
@@ -497,7 +416,7 @@ pub mod test {
         )
         .unwrap();
 
-        let instruction = create_delegate_promo_instruction(
+        let instruction = delegate_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
             location,
@@ -580,7 +499,7 @@ pub mod test {
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
-        let instruction = create_burn_delegated_promo_instruction(
+        let instruction = burn_delegated_promo_instruction(
             device_owner,
             location,
             device,
@@ -704,7 +623,7 @@ pub mod test {
                 .unwrap()
                 .serve(
                     create_app(
-                        Cluster::Localnet,
+                        Cluster::Devnet,
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
@@ -795,7 +714,7 @@ pub mod test {
                 .unwrap()
                 .serve(
                     create_app(
-                        Cluster::Localnet,
+                        Cluster::Devnet,
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
@@ -885,7 +804,7 @@ pub mod test {
                 .unwrap()
                 .serve(
                     create_app(
-                        Cluster::Localnet,
+                        Cluster::Devnet,
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
@@ -961,7 +880,7 @@ pub mod test {
                 .unwrap()
                 .serve(
                     create_app(
-                        Cluster::Localnet,
+                        Cluster::Devnet,
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),

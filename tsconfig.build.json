@@ -14,7 +14,7 @@
     "emitDeclarationOnly": false,
     "importHelpers": false,
     "strict": true,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "noFallthroughCasesInSwitch": true,
     "downlevelIteration": true,
     "esModuleInterop": true,
@@ -22,7 +22,7 @@
     "incremental": false,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "useUnknownInCatchVariables": false
+    "useUnknownInCatchVariables": false,
   },
   "include": ["./src"],
   "exclude": ["node_modules", "dist", "build", "lib"]

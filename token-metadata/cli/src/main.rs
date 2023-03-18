@@ -81,6 +81,10 @@ enum Commands {
     InstructionDiscriminator {
         #[clap(index=1)]
         name: String
+    },
+    PurgeImgx {
+        #[clap(index=1)]
+        url: String
     }
 }
 
@@ -226,7 +230,8 @@ async fn main() -> anyhow::Result<()> {
             uri,
             lamports
         } => {
-            let payer = merchant_keypair.pubkey();
+            let owner = merchant_keypair.pubkey();
+            let payer = platform_signer_keypair.pubkey();
             let rc_payer_keypair = Rc::new(merchant_keypair);
             let client = Client::new_with_options(
                 cli.cluster,
@@ -236,12 +241,12 @@ async fn main() -> anyhow::Result<()> {
 
             let program = client.program(bpl_token_metadata::id());
 
-            let merchant = find_merchant_address(&payer).0;
+            let merchant = find_merchant_address(&owner).0;
             let campaign = find_campaign_address(&merchant, name).0;
             
             // this needs to be updated for actual location, just addresses for now
             let locations = vec![
-                payer,
+                owner,
                 device_owner_keypair.pubkey(),
                 platform_signer_keypair.pubkey()
                 ];
@@ -258,6 +263,7 @@ async fn main() -> anyhow::Result<()> {
             .request()
             .accounts(accounts::CreateCampaign {
                 payer,
+                owner,
                 merchant,
                 campaign,
                 memo_program: spl_memo::ID,
@@ -370,6 +376,29 @@ async fn main() -> anyhow::Result<()> {
 
             sighash("global", name); 
             
+            Ok(())
+        }
+        Commands::PurgeImgx { url } => {
+            let client = reqwest::Client::new();
+
+            let body = serde_json::json!(
+                {
+                    "data": {
+                        "attributes": {
+                            "url": &url
+                        },
+                        "type": "purges"
+                    }
+                }
+            );
+
+            let result = client.post("https://api.imgix.com/api/v1/purge")
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", std::env::var("IMGIX_API_TOKEN").unwrap()))
+            .json(&body)
+            .send().await?;
+
+            println!("{}", result.text().await?);
+
             Ok(())
         }
 

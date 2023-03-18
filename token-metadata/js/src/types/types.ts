@@ -18,30 +18,30 @@ export type AdminSettings = {
 
 export type Merchant = {
   owner: PublicKey;
-  name: String;
-  uri: String;
+  name: string;
+  uri: string;
   active: boolean;
 };
 
 export type Location = {
   merchant: PublicKey;
-  name: String;
-  uri: String;
+  name: string;
+  uri: string;
   active: boolean;
 };
 
 export type Device = {
   owner: PublicKey;
   location: PublicKey;
-  name: String;
-  uri: String;
+  name: string;
+  uri: string;
   active: boolean;
 };
 
 export type Campaign = {
   merchant: PublicKey;
-  name: String;
-  uri: String;
+  name: string;
+  uri: string;
   locations: Array<PublicKey>;
   active: boolean;
 };

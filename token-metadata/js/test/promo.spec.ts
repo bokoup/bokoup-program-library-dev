@@ -104,12 +104,14 @@ describe('promo', () => {
       addresses.map((address) => tokenOwnerProvider.connection.getAccountInfo(address)),
     );
     accountInfos.map((account) => {
-      expect(account!.lamports).to.equal(amount, 'Platform lamports incorrect.');
+      if (account != null) {
+        expect(account.lamports).to.equal(amount, 'Platform lamports incorrect.');
+      }
     });
   });
 
   it('creates admin settings', async () => {
-    adminSettings = await tokenMetadataProgram.findAdminAddress();
+    adminSettings = tokenMetadataProgram.findAdminAddress();
 
     await tokenMetadataProgram.createAdminSettings(platform, 10_000_000, 1_000_000);
 
@@ -132,8 +134,12 @@ describe('promo', () => {
 
     const memo = 'Created a new merchant';
 
-    let tx: string = '';
-    [tx, merchant] = await tokenMetadataProgramMerchantOwner.createMerchant(merchantData, memo);
+    let _ = '';
+    [_, merchant] = await tokenMetadataProgramMerchantOwner.createMerchant(
+      merchantData,
+      platformSigner,
+      memo,
+    );
 
     const merchantAccount = await tokenMetadataProgram.program.account.merchant.fetch(merchant);
 
@@ -145,8 +151,13 @@ describe('promo', () => {
     const uri = 'https://location.example.com';
     const memo = 'Created a new location';
 
-    let tx: string = '';
-    [tx, location] = await tokenMetadataProgramMerchantOwner.createLocation(name, uri, memo);
+    let _ = '';
+    [_, location] = await tokenMetadataProgramMerchantOwner.createLocation(
+      platformSigner,
+      name,
+      uri,
+      memo,
+    );
 
     const account = await tokenMetadataProgram.program.account.location.fetch(location);
 
@@ -158,8 +169,9 @@ describe('promo', () => {
     const uri = 'https://device.example.com';
     const memo = 'Created a new device';
 
-    let tx: string = '';
-    [tx, device] = await tokenMetadataProgramMerchantOwner.createDevice(
+    let _ = '';
+    [_, device] = await tokenMetadataProgramMerchantOwner.createDevice(
+      platformSigner,
       deviceOwner.publicKey,
       name,
       uri,
@@ -179,8 +191,9 @@ describe('promo', () => {
     const uri = 'https://campaign.example.com';
     const memo = 'Created a new campaign';
 
-    let tx: string = '';
-    [tx, campaign] = await tokenMetadataProgramMerchantOwner.createCampaign(
+    let _ = '';
+    [_, campaign] = await tokenMetadataProgramMerchantOwner.createCampaign(
+      platformSigner,
       name,
       uri,
       [location],
@@ -197,7 +210,13 @@ describe('promo', () => {
       campaign,
     );
 
-    expect(accountInfo?.lamports).to.equal(505240880);
+    expect(accountInfo?.lamports).to.equal(505_240_880);
+
+    const merchantOwnerBalance = await tokenMetadataProgram.program.provider.connection.getBalance(
+      merchantOwner.publicKey,
+    );
+
+    expect(merchantOwnerBalance).to.equal(499_970_000);
   });
 
   it('transfers cpi', async () => {
@@ -461,10 +480,12 @@ describe('promo', () => {
     console.log('ah_bidReceipt: ', bidReceiptAccount);
 
     const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
-    expect(escrowAccountInfo!.lamports).to.equal(
-      salePrice + 890880,
-      'escrowAccount lamports incorrect.',
-    );
+    if (escrowAccountInfo != null) {
+      expect(escrowAccountInfo.lamports).to.equal(
+        salePrice + 890880,
+        'escrowAccount lamports incorrect.',
+      );
+    }
   });
 
   it('executes a sale', async () => {
@@ -505,19 +526,25 @@ describe('promo', () => {
     console.log('ah_purchaseReceipt: ', purchaseReceiptAccount);
 
     const escrowAccountInfo = await connection.getAccountInfo(escrowPaymentAccount);
-    expect(escrowAccountInfo!.lamports).to.equal(890880, 'escrowAccount lamports incorrect.');
+    if (escrowAccountInfo != null) {
+      expect(escrowAccountInfo.lamports).to.equal(890880, 'escrowAccount lamports incorrect.');
+    }
 
     const sellerTokenAccountData = await getAccount(connection, sellerTokenAccount);
-    expect(Number(sellerTokenAccountData!.amount)).to.equal(
-      0,
-      'sellerTokenAccount amount incorrect.',
-    );
+    if (sellerTokenAccountData != null) {
+      expect(Number(sellerTokenAccountData.amount)).to.equal(
+        0,
+        'sellerTokenAccount amount incorrect.',
+      );
+    }
 
     const buyerTokenAccountData = await getAccount(connection, buyerTokenAccount);
-    expect(Number(buyerTokenAccountData!.amount)).to.equal(
-      tokenSize,
-      'buyerTokenAccount amount incorrect.',
-    );
+    if (buyerTokenAccountData != null) {
+      expect(Number(buyerTokenAccountData.amount)).to.equal(
+        tokenSize,
+        'buyerTokenAccount amount incorrect.',
+      );
+    }
   });
 
   it('creates a non-fungible', async () => {
@@ -532,10 +559,8 @@ describe('promo', () => {
       uses: null,
     };
 
-    const [tx, mint, metadata, edition] = await tokenMetadataProgramMerchantOwner.createNonFungible(
-      metadataData2,
-      merchantOwner,
-    );
+    const [_tx, _mint, metadata, edition] =
+      await tokenMetadataProgramMerchantOwner.createNonFungible(metadataData2, merchantOwner);
     const [metadataAccount, editionAccount] = await Promise.all([
       tokenMetadataProgramMerchantOwner.getMetadataAccount(metadata),
       tokenMetadataProgramMerchantOwner.getMasterEditionAccount(edition),

@@ -64,8 +64,20 @@ pub struct BasicParams {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct MerchantParams {
+    pub owner: String,
+    pub memo: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct LocationParams {
-    pub payer: String,
+    pub owner: String,
+    pub memo: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct DeviceParams {
+    pub merchant_owner: String,
     pub location: String,
     pub owner: String,
     pub memo: Option<String>,
@@ -73,7 +85,7 @@ pub struct LocationParams {
 
 #[derive(Deserialize, Debug)]
 pub struct CampaignParams {
-    pub payer: String,
+    pub owner: String,
     pub lamports: u64,
     pub memo: Option<String>,
     pub locations: String,

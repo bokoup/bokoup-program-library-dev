@@ -12,7 +12,7 @@ use axum::{
     extract::{Multipart, Path},
     Extension, Json,
 };
-use solana_sdk::{pubkey::ParsePubkeyError, transaction::Transaction};
+use solana_sdk::{pubkey::ParsePubkeyError, signer::Signer, transaction::Transaction};
 use std::{str::FromStr, sync::Arc};
 
 use super::{CampaignParams, PayResponse};
@@ -20,7 +20,7 @@ use super::{CampaignParams, PayResponse};
 pub async fn handler(
     multipart: Multipart,
     Path(CampaignParams {
-        payer,
+        owner,
         lamports,
         memo,
         locations,
@@ -28,13 +28,13 @@ pub async fn handler(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(
-        payer = payer,
+        owner = owner,
         lamports = lamports,
         memo = memo,
         locations = locations
     );
-
-    let payer = Pubkey::from_str(&payer)?;
+    let payer = state.platform_signer.pubkey();
+    let owner = Pubkey::from_str(&owner)?;
 
     let locations: Vec<Pubkey> = locations
         .split("/")
@@ -68,12 +68,15 @@ pub async fn handler(
     };
 
     // Upload metadata json to Arweave.
-    let uri = upload_metadata_json(metadata_data_obj, state).await?.0;
+    let (uri, state) = upload_metadata_json(metadata_data_obj, state).await?;
 
     // Create location instruction.
-    let ix = create_campaign_instruction(payer, name, uri, locations, lamports, active, memo)?;
+    let ix =
+        create_campaign_instruction(payer, owner, name, uri, locations, lamports, active, memo)?;
 
-    let tx = Transaction::new_with_payer(&[ix], Some(&payer));
+    let mut tx = Transaction::new_with_payer(&[ix], Some(&payer));
+    let latest_blockhash = &state.solana.get_latest_blockhash().await?;
+    tx.try_partial_sign(&[&state.platform_signer], latest_blockhash.clone())?;
 
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);

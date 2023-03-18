@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bpl_token_metadata::state::Campaign;
 use tokio_postgres::{types::Json, Client};
 use tracing::{error, info};
@@ -18,6 +20,22 @@ pub async fn upsert(
     let slot = slot as i64;
     let write_version = write_version as i64;
 
+    let reqwest_client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .unwrap();
+
+    let metadata_json: Option<serde_json::Value> =
+        if let Ok(response) = reqwest_client.get(&account.uri).send().await {
+            if let Ok(result) = response.json::<serde_json::Value>().await {
+                Some(result)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
     let result = client
         .query_one(
             UPSERT_QUERY,
@@ -25,7 +43,8 @@ pub async fn upsert(
                 &id,
                 &merchant,
                 &account.name,
-                &account.name,
+                &account.uri,
+                &metadata_json,
                 &Json::<Vec<String>>(locations),
                 &account.active,
                 &slot,

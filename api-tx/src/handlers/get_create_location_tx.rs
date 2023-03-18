@@ -12,16 +12,18 @@ use axum::{
     extract::{Multipart, Path},
     Extension, Json,
 };
-use solana_sdk::transaction::Transaction;
+use solana_sdk::{signature::Signer, transaction::Transaction};
 use std::{str::FromStr, sync::Arc};
 
-use super::{BasicParams, PayResponse};
+use super::{LocationParams, PayResponse};
 
 pub async fn handler(
     multipart: Multipart,
-    Path(BasicParams { payer, memo }): Path<BasicParams>,
+    Path(LocationParams { owner, memo }): Path<LocationParams>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
+    let payer = state.platform_signer.pubkey();
+
     // Parse data - two parts - json data and image.
     let (mut metadata_data, image_data) = get_metadata(multipart).await?;
 
@@ -46,14 +48,16 @@ pub async fn handler(
     };
 
     // Upload metadata json to Arweave.
-    let uri = upload_metadata_json(metadata_data_obj, state).await?.0;
+    let (uri, state) = upload_metadata_json(metadata_data_obj, state).await?;
 
-    let payer = Pubkey::from_str(&payer)?;
+    let owner = Pubkey::from_str(&owner)?;
 
     // Create location instruction.
-    let ix = create_location_instruction(payer, name, uri, active, memo)?;
+    let ix = create_location_instruction(payer, owner, name, uri, active, memo)?;
 
-    let tx = Transaction::new_with_payer(&[ix], Some(&payer));
+    let mut tx = Transaction::new_with_payer(&[ix], Some(&payer));
+    let latest_blockhash = &state.solana.get_latest_blockhash().await?;
+    tx.try_partial_sign(&[&state.platform_signer], latest_blockhash.clone())?;
 
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);

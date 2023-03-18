@@ -173,13 +173,15 @@ pub struct CreateAdminSettings<'info> {
 pub struct CreateMerchant<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
     /// CHECK: pubkey checked via seeds
     #[account(
         init,
-        constraint = merchant_data.owner == payer.key(),
+        constraint = merchant_data.owner == owner.key(),
         constraint = merchant_data.name.len() <= MAX_NAME_LENGTH,
         constraint = merchant_data.uri.len() <= MAX_URI_LENGTH,
-        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+        seeds = [MERCHANT_PREFIX.as_bytes(), owner.key().as_ref()], bump,
         payer = payer,
         space = Merchant::LEN
     )]
@@ -196,10 +198,12 @@ pub struct CreateMerchant<'info> {
 pub struct CreateLocation<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
     /// CHECK: pubkey checked via seeds
     #[account(
-        constraint = merchant.owner == payer.key(),
-        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+        constraint = merchant.owner == owner.key(),
+        seeds = [MERCHANT_PREFIX.as_bytes(), owner.key().as_ref()], bump,
     )]
     pub merchant: Account<'info, Merchant>,
     #[account(
@@ -224,9 +228,11 @@ pub struct CreateLocation<'info> {
 pub struct CreateDevice<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+    #[account(mut)]
+    pub merchant_owner: Signer<'info>,
     #[account(
-        constraint = merchant.owner == payer.key(),
-        seeds = [MERCHANT_PREFIX.as_bytes(), payer.key().as_ref()], bump,
+        constraint = merchant.owner == merchant_owner.key(),
+        seeds = [MERCHANT_PREFIX.as_bytes(), merchant_owner.key().as_ref()], bump,
     )]
     pub merchant: Account<'info, Merchant>,
     #[account(constraint = location.merchant == merchant.key())]
@@ -260,7 +266,9 @@ pub struct CreateDevice<'info> {
 pub struct CreateCampaign<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(constraint = payer.key() == merchant.owner)]
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(constraint = owner.key() == merchant.owner)]
     pub merchant: Account<'info, Merchant>,
     #[account(
         init,
@@ -384,7 +392,6 @@ pub struct MintPromoToken<'info> {
     )]
     pub device: Account<'info, Device>,
     #[account(mut,
-        constraint = campaign.locations.contains(&location.key()),
         constraint = campaign.key() == promo.campaign,
     )]
     pub campaign: Box<Account<'info, Campaign>>,

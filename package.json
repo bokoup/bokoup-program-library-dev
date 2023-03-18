@@ -4,7 +4,7 @@
     "version": "0.1.0",
     "description": "Programs for coupons, promotional offers and loyalty tokens on the Solana blockchain.",
     "scripts": {
-        "build": "anchor build && lerna run build --scope @bokoup/bpl-token-metadata && lerna run update:tm --scope @bokoup/bpl-demo",
+        "build": "anchor build && lerna run build --scope @bokoup/bpl-token-metadata",
         "test": "lerna run --parallel test",
         "lint": "lerna run --parallel lint",
         "fix": "lerna run --parallel fix"
