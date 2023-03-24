@@ -30,8 +30,9 @@ pub async fn upsert(
 
     let signature = signature.to_string();
     let payer = &accounts[0];
-    let merchant = &accounts[1];
-    let location = &accounts[2];
+    let owner = &accounts[1];
+    let merchant = &accounts[2];
+    let location = &accounts[3];
     let slot = slot as i64;
 
     let result = client
@@ -40,6 +41,7 @@ pub async fn upsert(
             &[
                 &signature,
                 payer,
+                owner,
                 merchant,
                 location,
                 &Json::<Option<serde_json::Value>>(memo),

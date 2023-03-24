@@ -407,7 +407,7 @@ pub struct MintPromoToken<'info> {
     pub payer: Signer<'info>,
     #[account(mut, constraint = device.owner == device_owner.key())]
     pub device_owner: Signer<'info>,
-    #[account(mut, constraint = device.location == campaign_location.location.key())]
+    #[account(mut, constraint = device.location == campaign_location.location)]
     pub device: Account<'info, Device>,
     #[account(mut,
         constraint = campaign.key() == promo.campaign,
@@ -417,7 +417,7 @@ pub struct MintPromoToken<'info> {
         constraint = campaign.key() == promo.campaign,
         constraint = campaign.key() == campaign_location.campaign,
     )]
-    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.key().as_ref()], bump)]
+    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.as_ref()], bump)]
     pub campaign_location: Account<'info, CampaignLocation>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
@@ -456,7 +456,7 @@ pub struct DelegatePromoToken<'info> {
     pub device_owner: UncheckedAccount<'info>,
     #[account(
         constraint = device.owner == device_owner.key(),
-        constraint = device.location == campaign_location.location.key()
+        constraint = device.location == campaign_location.location
     )]
     pub device: Account<'info, Device>,
     #[account(mut,
@@ -464,7 +464,7 @@ pub struct DelegatePromoToken<'info> {
         constraint = campaign.key() == campaign_location.campaign,
     )]
     pub campaign: Box<Account<'info, Campaign>>,
-    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.key().as_ref()], bump)]
+    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.as_ref()], bump)]
     pub campaign_location: Account<'info, CampaignLocation>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
@@ -500,7 +500,7 @@ pub struct BurnDelegatedPromoToken<'info> {
     pub device_owner: Signer<'info>,
     #[account(
         constraint = device.owner == device_owner.key(),
-        constraint = device.location == campaign_location.location.key()
+        constraint = device.location == campaign_location.location
     )]
     pub device: Box<Account<'info, Device>>,
     #[account(mut,
@@ -527,7 +527,7 @@ pub struct BurnDelegatedPromoToken<'info> {
     pub admin_settings: Account<'info, AdminSettings>,
     #[account(mut,
         constraint = token_account.mint == mint.key(),
-        constraint = token_account.delegate.unwrap() == payer.key(),
+        constraint = token_account.delegate.unwrap() == device_owner.key(),
         constraint = token_account.delegated_amount > 0,
     )]
     pub token_account: Account<'info, TokenAccount>,

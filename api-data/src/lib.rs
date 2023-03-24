@@ -62,7 +62,9 @@ pub async fn apply_migrations(client: &mut Client) -> Result<(), Error> {
 mod tests {
     use super::*;
     use anchor_spl::associated_token::get_associated_token_address;
-    use bpl_token_metadata::state::{AdminSettings, Campaign, Device, Location, Merchant, Promo};
+    use bpl_token_metadata::state::{
+        AdminSettings, Campaign, CampaignLocation, Device, Location, Merchant, Promo,
+    };
     use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
     use mpl_auction_house::{
         pda::{
@@ -239,6 +241,40 @@ mod tests {
             row.get::<&str, String>("merchant"),
             account.merchant.to_string(),
             "it_upserts_campaign: merchant failed"
+        );
+    }
+
+    async fn it_upserts_campaign_location(
+        client: &Client,
+        key: &[u8],
+        account: &CampaignLocation,
+        slot: u64,
+        write_version: u64,
+    ) {
+        queries::bpl_token_metadata::campaign_location::upsert(
+            client,
+            key,
+            account,
+            slot,
+            write_version,
+        )
+        .await;
+        let row = client
+            .query_one(
+                "SELECT * FROM campaign_location WHERE id = $1",
+                &[&bs58::encode(key).into_string()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.get::<&str, String>("campaign"),
+            account.campaign.to_string(),
+            "it_upserts_campaign_location: campaign failed"
+        );
+        assert_eq!(
+            row.get::<&str, String>("location"),
+            account.location.to_string(),
+            "it_upserts_campaign_location: location failed"
         );
     }
 
@@ -504,6 +540,11 @@ mod tests {
                 client, signature, accounts, data, slot,
             )
             .await;
+        } else if table == "create_campaign_location" {
+            queries::bpl_token_metadata::create_campaign_location::upsert(
+                client, signature, accounts, data, slot,
+            )
+            .await;
         } else if table == "create_merchant" {
             queries::bpl_token_metadata::create_merchant::upsert(
                 client, signature, accounts, data, slot,
@@ -574,6 +615,7 @@ mod tests {
             "create_location",
             "create_device",
             "create_campaign",
+            "create_campaign_location",
             "create_promo",
             "mint_promo_token",
             "delegate_promo_token",
@@ -642,19 +684,31 @@ mod tests {
 
         // upsert campaign
         let merchant = Pubkey::new_unique();
-        let location = Pubkey::new_unique();
         let campaign_pubkey = Pubkey::new_unique();
 
         let campaign = Campaign {
             merchant,
             name: "Test Campaign".to_string(),
             uri: "https://campaign.example.com".to_string(),
-
-            locations: vec![location],
             active: true,
         };
 
         it_upserts_campaign(&client, campaign_pubkey.as_ref(), &campaign, 42, 1).await;
+
+        // upsert campaign_location
+        let campaign_location_pubkey = Pubkey::new_unique();
+        let campaign_location = CampaignLocation {
+            campaign: Pubkey::new_unique(),
+            location: Pubkey::new_unique(),
+        };
+        it_upserts_campaign_location(
+            &client,
+            campaign_location_pubkey.as_ref(),
+            &campaign_location,
+            42,
+            1,
+        )
+        .await;
 
         // update a mint, null out an optional value
         mint.supply = 2;

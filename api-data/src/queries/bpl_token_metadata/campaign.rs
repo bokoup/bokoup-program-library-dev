@@ -43,7 +43,7 @@ pub async fn upsert(
                 &merchant,
                 &account.name,
                 &account.uri,
-                &metadata_json,
+                &Json::<Option<serde_json::Value>>(metadata_json),
                 &account.active,
                 &slot,
                 &write_version,

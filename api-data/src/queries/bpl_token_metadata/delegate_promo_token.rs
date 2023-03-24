@@ -31,9 +31,9 @@ pub async fn upsert(
     let signature = signature.to_string();
     let payer = &accounts[0];
     let device_owner = &accounts[1];
-    let location = &accounts[2];
-    let device = &accounts[3];
-    let campaign = &accounts[4];
+    let device = &accounts[2];
+    let campaign = &accounts[3];
+    let campaign_location = &accounts[4];
     let token_owner = &accounts[5];
     let mint = &accounts[6];
     let promo = &accounts[7];
@@ -47,9 +47,9 @@ pub async fn upsert(
                 &signature,
                 payer,
                 device_owner,
-                location,
                 device,
                 campaign,
+                campaign_location,
                 token_owner,
                 mint,
                 promo,

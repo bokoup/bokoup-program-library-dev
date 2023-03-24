@@ -31,20 +31,21 @@ pub async fn upsert(
 
     let signature = signature.to_string();
     let payer = &accounts[0];
-    let location = &accounts[1];
+    let device_owner = &accounts[1];
     let device = &accounts[2];
     let campaign = &accounts[3];
-    let mint = &accounts[4];
-    let authority = &accounts[5];
-    let promo = &accounts[6];
-    let platform = &accounts[7];
-    let admin_settings = &accounts[8];
-    let token_account = &accounts[9];
+    let campaign_location = &accounts[4];
+    let mint = &accounts[5];
+    let authority = &accounts[6];
+    let promo = &accounts[7];
+    let platform = &accounts[8];
+    let admin_settings = &accounts[9];
+    let token_account = &accounts[10];
     let slot = slot as i64;
 
     let payer_balance = balances[0] as i64;
     let campaign_balance = balances[3] as i64;
-    let platform_balance = balances[7] as i64;
+    let platform_balance = balances[8] as i64;
 
     let result = client
         .query_one(
@@ -53,10 +54,11 @@ pub async fn upsert(
                 &signature,
                 payer,
                 &payer_balance,
-                location,
+                device_owner,
                 device,
                 campaign,
                 &campaign_balance,
+                campaign_location,
                 mint,
                 authority,
                 promo,

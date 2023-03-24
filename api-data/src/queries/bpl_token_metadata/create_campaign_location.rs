@@ -3,7 +3,7 @@ use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use tokio_postgres::{types::Json, Client};
 use tracing::{error, info};
 
-const UPSERT_QUERY: &str = include_str!("mint_promo_token_upsert.sql");
+const UPSERT_QUERY: &str = include_str!("create_campaign_location_upsert.sql");
 
 #[tracing::instrument(skip_all)]
 pub async fn upsert(
@@ -15,30 +15,27 @@ pub async fn upsert(
 ) {
     let accounts: Vec<String> = accounts.iter().map(ToString::to_string).collect();
     let memo = if let Ok(args) =
-        bpl_token_metadata::instruction::MintPromoToken::try_from_slice(&data[8..])
+        bpl_token_metadata::instruction::CreateCampaignLocation::try_from_slice(&data[8..])
     {
-        args.memo.map(|m| {
+        let memo = args.memo.map(|m| {
             if let Ok(result) = serde_json::from_str::<serde_json::Value>(&m) {
                 result
             } else {
                 serde_json::json!({ "memo": m })
             }
-        })
+        });
+        memo
     } else {
         None
     };
 
     let signature = signature.to_string();
     let payer = &accounts[0];
-    let device_owner = &accounts[1];
-    let device = &accounts[2];
+    let owner = &accounts[1];
+    let merchant = &accounts[2];
     let campaign = &accounts[3];
-    let campaign_location = &accounts[4];
-    let token_owner = &accounts[5];
-    let mint = &accounts[6];
-    let authority = &accounts[7];
-    let promo = &accounts[8];
-    let token_account = &accounts[9];
+    let location = &accounts[4];
+    let campaign_location = &accounts[5];
     let slot = slot as i64;
 
     let result = client
@@ -47,15 +44,11 @@ pub async fn upsert(
             &[
                 &signature,
                 payer,
-                device_owner,
-                device,
+                owner,
+                merchant,
                 campaign,
-                campaign_location,
-                token_owner,
-                mint,
-                authority,
-                promo,
-                token_account,
+                &location,
+                &campaign_location,
                 &Json::<Option<serde_json::Value>>(memo),
                 &slot,
             ],
@@ -67,7 +60,7 @@ pub async fn upsert(
             info!(signature = signature.as_str(), insert);
         }
         Err(error) => {
-            error!(signature = signature.as_str(), ?error);
+            error!(signature = signature.as_str(), ?error,);
         }
     }
 }

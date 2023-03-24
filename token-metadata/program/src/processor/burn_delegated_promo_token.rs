@@ -28,7 +28,7 @@ impl<'info> BurnDelegatedPromoToken<'info> {
         let burn_ctx = anchor_spl::token::Burn {
             mint: self.mint.to_account_info(),
             from: self.token_account.to_account_info(),
-            authority: self.payer.to_account_info(),
+            authority: self.device_owner.to_account_info(),
         };
 
         anchor_spl::token::burn(
@@ -52,7 +52,10 @@ impl<'info> BurnDelegatedPromoToken<'info> {
         // }
 
         if let Some(memo) = memo {
-            let account_infos = vec![self.payer.to_account_info()];
+            let account_infos = vec![
+                self.payer.to_account_info(),
+                self.device_owner.to_account_info(),
+            ];
             create_memo(memo.to_string(), account_infos)?;
         }
 

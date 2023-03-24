@@ -1,9 +1,10 @@
 INSERT INTO mint_promo_token (
     signature,
     payer,
-    location,
+    device_owner,
     device,
     campaign,
+    campaign_location,
     token_owner,
     mint,
     authority,
@@ -12,13 +13,14 @@ INSERT INTO mint_promo_token (
     memo,
     slot
 )
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 ON CONFLICT ON CONSTRAINT mint_promo_token_pkey DO UPDATE 
     SET
         payer = EXCLUDED.payer,
-        location = EXCLUDED.location,
+        device_owner = EXCLUDED.device_owner,
         device = EXCLUDED.device,
         campaign = EXCLUDED.campaign,
+        campaign_location = EXCLUDED.campaign_location,
         token_owner = EXCLUDED.token_owner,
         mint = EXCLUDED.mint,
         authority = EXCLUDED.authority,

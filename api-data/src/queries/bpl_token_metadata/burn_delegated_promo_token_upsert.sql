@@ -2,10 +2,11 @@ INSERT INTO burn_delegated_promo_token (
     signature,
     payer,
     payer_balance,
-    location,
+    device_owner,
     device,
     campaign,
     campaign_balance,
+    campaign_location,
     mint,
     authority,
     promo,
@@ -16,15 +17,16 @@ INSERT INTO burn_delegated_promo_token (
     memo,
     slot
 )
-    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 ON CONFLICT ON CONSTRAINT burn_delegated_promo_token_pkey DO UPDATE 
     SET
         payer = EXCLUDED.payer,
         payer_balance = EXCLUDED.payer_balance,
-        location = EXCLUDED.location,
+        device_owner = EXCLUDED.device_owner,
         device = EXCLUDED.device,
         campaign = EXCLUDED.campaign,
         campaign_balance = EXCLUDED.campaign_balance,
+        campaign_location = EXCLUDED.campaign_location,
         mint = EXCLUDED.mint,
         authority = EXCLUDED.authority,
         promo = EXCLUDED.promo,
