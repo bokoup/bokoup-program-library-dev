@@ -245,18 +245,11 @@ async fn main() -> anyhow::Result<()> {
             let campaign = find_campaign_address(&merchant, name).0;
             
             // this needs to be updated for actual location, just addresses for now
-            let locations = vec![
-                owner,
-                device_owner_keypair.pubkey(),
-                platform_signer_keypair.pubkey()
-                ];
-
             let data = Campaign {
                     merchant,
                     name: name.clone(),
                     uri: uri.clone(),
                     active: true,
-                    locations,
                 };
 
             let tx = program

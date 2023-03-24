@@ -19,9 +19,9 @@ pub async fn handler(
     Path(DelegateParams {
         mint,
         device_owner,
-        location,
         device,
         campaign,
+        location,
         message,
         memo,
     }): Path<DelegateParams>,
@@ -31,16 +31,16 @@ pub async fn handler(
     let payer = state.platform_signer.pubkey();
     let mint = Pubkey::from_str(&mint)?;
     let device_owner = Pubkey::from_str(&device_owner)?;
-    let location = Pubkey::from_str(&location)?;
     let device = Pubkey::from_str(&device)?;
     let campaign = Pubkey::from_str(&campaign)?;
+    let location = Pubkey::from_str(&location)?;
 
     let instruction = delegate_promo_instruction(
         payer,
         device_owner,
-        location,
         device,
         campaign,
+        location,
         token_owner,
         mint,
         memo,

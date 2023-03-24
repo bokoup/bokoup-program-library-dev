@@ -11,8 +11,8 @@ pub const MERCHANT_PREFIX: &str = "merchant";
 pub const LOCATION_PREFIX: &str = "location";
 pub const DEVICE_PREFIX: &str = "device";
 pub const CAMPAIGN_PREFIX: &str = "campaign";
+pub const CAMPAIGN_LOCATION_PREFIX: &str = "campaign_location";
 pub const PROMO_PREFIX: &str = "promo";
-pub const LOCATIONS_CAPACITY: usize = 10;
 pub const MAX_NAME_LENGTH: usize = 64;
 pub const MAX_URI_LENGTH: usize = 200;
 
@@ -156,6 +156,17 @@ pub fn find_campaign_address(merchant: &Pubkey, name: &str) -> (Pubkey, u8) {
             CAMPAIGN_PREFIX.as_bytes(),
             merchant.as_ref(),
             name.as_bytes(),
+        ],
+        &crate::id(),
+    )
+}
+
+pub fn find_campaign_location_address(campaign: &Pubkey, location: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(
+        &[
+            CAMPAIGN_LOCATION_PREFIX.as_bytes(),
+            campaign.as_ref(),
+            location.as_ref(),
         ],
         &crate::id(),
     )

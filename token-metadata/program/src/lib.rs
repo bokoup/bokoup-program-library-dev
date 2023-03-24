@@ -11,9 +11,9 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 use borsh::BorshDeserialize;
-use state::{AdminSettings, Campaign, DataV2, Device, Location, Merchant, Promo};
+use state::{AdminSettings, Campaign, CampaignLocation, DataV2, Device, Location, Merchant, Promo};
 use utils::{
-    ADMIN_PREFIX, AUTHORITY_PREFIX, CAMPAIGN_PREFIX, DEVICE_PREFIX, LOCATIONS_CAPACITY,
+    ADMIN_PREFIX, AUTHORITY_PREFIX, CAMPAIGN_LOCATION_PREFIX, CAMPAIGN_PREFIX, DEVICE_PREFIX,
     LOCATION_PREFIX, MAX_NAME_LENGTH, MAX_URI_LENGTH, MERCHANT_PREFIX, PROMO_PREFIX,
 };
 
@@ -64,8 +64,6 @@ pub mod bpl_token_metadata {
         ctx.accounts.process(data, memo)
     }
 
-    /// Creates Group account used to grant transaction execution permissions to
-    /// group members.
     pub fn create_campaign(
         ctx: Context<CreateCampaign>,
         data: Campaign,
@@ -73,6 +71,13 @@ pub mod bpl_token_metadata {
         memo: Option<String>,
     ) -> Result<()> {
         ctx.accounts.process(data, lamports, memo)
+    }
+
+    pub fn create_campaign_location(
+        ctx: Context<CreateCampaignLocation>,
+        memo: Option<String>,
+    ) -> Result<()> {
+        ctx.accounts.process(memo)
     }
 
     /// Creates Promo account and related mint and metadata accounts.
@@ -252,15 +257,8 @@ pub struct CreateDevice<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Accounts related to creating a [Group].
+/// Accounts related to creating a [Campaign].
 ///
-/// [Group] account owns [Promo] account. [Group] has an owner and members. Members can sign on behalf of the
-/// group to mint tokens. Can be set with a members_capacity value of up to 255. Checks to make sure that
-/// members_capacity is at least as big as the initial number of members. Also requires that the owner of the group
-/// be the payer of the transaction and that the owner be include in the members.
-///
-/// [Group] has a program derived address so that permissions to it can be managed by the program. The seed is based
-/// on a public key passed in to the program.
 #[derive(Accounts)]
 #[instruction(data: Campaign)]
 pub struct CreateCampaign<'info> {
@@ -273,13 +271,37 @@ pub struct CreateCampaign<'info> {
     #[account(
         init,
         constraint = data.merchant == merchant.key(),
-        constraint = data.locations.len() <= LOCATIONS_CAPACITY as usize,
         constraint = data.name.len() <= MAX_NAME_LENGTH,
         seeds = [CAMPAIGN_PREFIX.as_bytes(), merchant.key().as_ref(), data.name.as_bytes()], bump,
         payer = payer,
         space = Campaign::LEN
     )]
     pub campaign: Account<'info, Campaign>,
+    pub memo_program: Program<'info, SplMemo>,
+    pub system_program: Program<'info, System>,
+}
+
+/// Accounts related to creating a [CampaignLocation].
+///
+#[derive(Accounts)]
+pub struct CreateCampaignLocation<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(constraint = owner.key() == merchant.owner)]
+    pub merchant: Account<'info, Merchant>,
+    #[account(constraint = campaign.merchant == merchant.key())]
+    pub campaign: Account<'info, Campaign>,
+    #[account(constraint = location.merchant == merchant.key())]
+    pub location: Account<'info, Location>,
+    #[account(
+        init,
+        seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), location.key().as_ref()], bump,
+        payer = payer,
+        space = CampaignLocation::LEN
+    )]
+    pub campaign_location: Account<'info, CampaignLocation>,
     pub memo_program: Program<'info, SplMemo>,
     pub system_program: Program<'info, System>,
 }
@@ -309,7 +331,9 @@ pub struct CreateCampaign<'info> {
 pub struct CreatePromo<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, constraint = payer.key() == merchant.owner)]
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(mut, constraint = owner.key() == merchant.owner)]
     pub merchant: Account<'info, Merchant>,
     #[account(mut,
         constraint = merchant.key() == campaign.merchant,
@@ -328,7 +352,7 @@ pub struct CreatePromo<'info> {
     #[account(init, payer = payer,
         seeds = [PROMO_PREFIX.as_bytes(), mint.key().as_ref()], bump,
         space = Promo::LEN)]
-    pub promo: Account<'info, Promo>,
+    pub promo: Box<Account<'info, Promo>>,
     /// CHECK: pubkey checked via constraint
     #[account(mut,
         constraint = platform.key() == admin_settings.platform
@@ -351,11 +375,8 @@ pub struct TransferCpi<'info> {
     pub payer: Signer<'info>,
     #[account(constraint = payer.key() == merchant.owner)]
     pub merchant: Account<'info, Merchant>,
-    #[account(constraint = campaign.locations.contains(&location.key()))]
-    pub location: Account<'info, Location>,
     #[account(
         constraint = device.owner == payer.key(),
-        constraint = device.location == location.key(),
     )]
     pub device: Account<'info, Device>,
     #[account(mut)]
@@ -382,19 +403,22 @@ pub struct TransferCpi<'info> {
 /// No platform fees result from minting a token.
 #[derive(Accounts, Clone)]
 pub struct MintPromoToken<'info> {
-    #[account(mut, constraint = device.owner == payer.key())]
+    #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
-    pub location: Account<'info, Location>,
-    #[account(
-        constraint = device.location == location.key(),
-        constraint = device.owner == payer.key()
-    )]
+    #[account(mut, constraint = device.owner == device_owner.key())]
+    pub device_owner: Signer<'info>,
+    #[account(mut, constraint = device.location == campaign_location.location.key())]
     pub device: Account<'info, Device>,
     #[account(mut,
         constraint = campaign.key() == promo.campaign,
     )]
     pub campaign: Box<Account<'info, Campaign>>,
+    #[account(mut,
+        constraint = campaign.key() == promo.campaign,
+        constraint = campaign.key() == campaign_location.campaign,
+    )]
+    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.key().as_ref()], bump)]
+    pub campaign_location: Account<'info, CampaignLocation>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
     #[account(mut)]
@@ -430,18 +454,18 @@ pub struct DelegatePromoToken<'info> {
     pub payer: Signer<'info>,
     /// CHECK: checked via device constraints
     pub device_owner: UncheckedAccount<'info>,
-    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
-    pub location: Account<'info, Location>,
     #[account(
-        constraint = device.location == location.key(),
-        constraint = device.owner == device_owner.key()
+        constraint = device.owner == device_owner.key(),
+        constraint = device.location == campaign_location.location.key()
     )]
     pub device: Account<'info, Device>,
     #[account(mut,
-        constraint = campaign.locations.contains(&location.key()),
         constraint = campaign.key() == promo.campaign,
+        constraint = campaign.key() == campaign_location.campaign,
     )]
     pub campaign: Box<Account<'info, Campaign>>,
+    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.key().as_ref()], bump)]
+    pub campaign_location: Account<'info, CampaignLocation>,
     #[account(mut)]
     pub token_owner: Signer<'info>,
     #[account(mut)]
@@ -472,24 +496,29 @@ pub struct DelegatePromoToken<'info> {
 pub struct BurnDelegatedPromoToken<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    #[account(mut, constraint = campaign.locations.contains(&location.key()))]
-    pub location: Account<'info, Location>,
+    #[account(mut)]
+    pub device_owner: Signer<'info>,
     #[account(
-        constraint = device.location == location.key(),
-        constraint = device.owner == payer.key()
+        constraint = device.owner == device_owner.key(),
+        constraint = device.location == campaign_location.location.key()
     )]
     pub device: Box<Account<'info, Device>>,
     #[account(mut,
-        constraint = campaign.locations.contains(&location.key()),
         constraint = campaign.key() == promo.campaign,
+        constraint = campaign.key() == campaign_location.campaign,
     )]
     pub campaign: Box<Account<'info, Campaign>>,
+    #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.as_ref()], bump)]
+    pub campaign_location: Account<'info, CampaignLocation>,
     #[account(mut)]
     pub mint: Account<'info, Mint>,
     /// CHECK: pubkey checked via spl token program instruction
     #[account(seeds = [AUTHORITY_PREFIX.as_bytes()], bump)]
     pub authority: UncheckedAccount<'info>,
-    #[account(mut, seeds = [PROMO_PREFIX.as_bytes(), mint.key().as_ref()], bump)]
+    #[account(mut,
+        seeds = [PROMO_PREFIX.as_bytes(), mint.key().as_ref()], bump,
+        constraint = promo.campaign == campaign.key()
+    )]
     pub promo: Account<'info, Promo>,
     /// CHECK: pubkey checked via constraint
     #[account(mut, constraint = platform.key() == admin_settings.platform)]

@@ -1,3 +1,4 @@
+pub mod admin_settings;
 pub mod burn_delegated_promo_token;
 pub mod campaign;
 pub mod create_campaign;

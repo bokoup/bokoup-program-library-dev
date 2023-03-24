@@ -91,35 +91,35 @@ pub fn create_app(
 
     Router::new()
         .route(
-            "/promo/mint/:mint/:location/:device/:campaign/:token_owner/:message",
+            "/promo/mint/:mint/:device/:device_owner/:location/:campaign/:message",
             get(get_app_id::handler).post(get_mint_promo_tx::handler),
         )
         .route(
-            "/promo/mint/:mint/:location/:device/:campaign/:token_owner/:message/:memo",
+            "/promo/mint/:mint/:device/:device_owner/:location/:campaign/:message/:memo",
             get(get_app_id::handler).post(get_mint_promo_tx::handler),
         )
         .route(
-            "/promo/delegate/:mint/:device_owner/:location/:device/:campaign/:message",
+            "/promo/delegate/:mint/:device_owner/:device/:location/:campaign/:message",
             get(get_app_id::handler).post(get_delegate_promo_tx::handler),
         )
         .route(
-            "/promo/delegate/:mint/:device_owner/:location/:device/:campaign/:message/:memo",
+            "/promo/delegate/:mint/:device_owner/:device/:location/:campaign/:message/:memo",
             get(get_app_id::handler).post(get_delegate_promo_tx::handler),
         )
         .route(
-            "/promo/burn-delegated/:mint/:token_account/:location/:device/:campaign/:message",
+            "/promo/burn-delegated/:mint/:token_account/:device/:location/:campaign/:message",
             get(get_app_id::handler).post(get_burn_delegated_promo_tx::handler),
         )
         .route(
-            "/promo/burn-delegated/:mint/:token_account/:location/:device/:campaign/:message/:memo",
+            "/promo/burn-delegated/:mint/:token_account/:device/:location/:campaign/:message/:memo",
             get(get_app_id::handler).post(get_burn_delegated_promo_tx::handler),
         )
         .route(
-            "/promo/create/:payer/:campaign",
+            "/promo/create/:owner/:campaign",
             get(get_app_id::handler).post(get_create_promo_tx::handler),
         )
         .route(
-            "/promo/create/:payer/:campaign/:memo",
+            "/promo/create/:owner/:campaign/:memo",
             get(get_app_id::handler).post(get_create_promo_tx::handler),
         )
         .route(
@@ -249,8 +249,7 @@ pub mod test {
             .oneshot(
                 Request::builder()
                     .uri(format!(
-                        "/promo/mint/{}/{}/{}/{}/{}/{}/{}",
-                        mint.to_string(),
+                        "/promo/mint/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
                         mint.to_string(),
                         mint.to_string(),
@@ -294,14 +293,14 @@ pub mod test {
         );
 
         let mint = Pubkey::new_unique();
-        let location = Pubkey::new_unique();
         let device = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
         let campaign = Pubkey::new_unique();
         let token_owner = Pubkey::new_unique();
         let device_owner = Pubkey::new_unique();
 
         let data = get_mint_promo_tx::Data {
-            account: device_owner.to_string(),
+            account: token_owner.to_string(),
         };
         let message = urlencoding::encode(MESSAGE);
         let memo = "jingus";
@@ -314,10 +313,10 @@ pub mod test {
                     .uri(format!(
                         "/promo/mint/{}/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
-                        location.to_string(),
                         device.to_string(),
+                        device_owner.to_string(),
+                        location.to_string(),
                         campaign.to_string(),
-                        token_owner.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
                     ))
@@ -333,18 +332,30 @@ pub mod test {
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
+        let txd: Transaction = bincode::deserialize(
+            &base64::decode::<String>(parsed_response.transaction.clone()).unwrap(),
+        )
+        .unwrap();
+
         let instruction = mint_promo_instruction(
+            platform_signer.pubkey(),
             device_owner,
-            location,
             device,
             campaign,
+            location,
             token_owner,
             mint,
             Some(memo.to_string()),
         )
         .unwrap();
 
-        let tx = Transaction::new_with_payer(&[instruction], Some(&device_owner));
+        let mut tx = Transaction::new_with_payer(&[instruction], Some(&platform_signer.pubkey()));
+
+        let recent_blockhash = txd.message.recent_blockhash;
+
+        tx.try_partial_sign(&[&platform_signer], recent_blockhash)
+            .unwrap();
+
         let serialized = bincode::serialize(&tx).unwrap();
         let transaction = base64::encode(serialized);
 
@@ -372,9 +383,9 @@ pub mod test {
 
         let mint = Pubkey::new_unique();
         let device_owner = Pubkey::new_unique();
-        let location = Pubkey::new_unique();
         let device = Pubkey::new_unique();
         let campaign = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
         let token_owner = Pubkey::new_unique();
 
         let data = get_mint_promo_tx::Data {
@@ -393,8 +404,8 @@ pub mod test {
                         "/promo/delegate/{}/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
                         device_owner.to_string(),
-                        location.to_string(),
                         device.to_string(),
+                        location.to_string(),
                         campaign.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
@@ -419,9 +430,9 @@ pub mod test {
         let instruction = delegate_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
-            location,
             device,
             campaign,
+            location,
             token_owner,
             mint,
             Some(memo.to_string()),
@@ -460,9 +471,9 @@ pub mod test {
 
         let mint = Pubkey::new_unique();
         let token_account = Pubkey::new_unique();
-        let location = Pubkey::new_unique();
         let device = Pubkey::new_unique();
         let campaign = Pubkey::new_unique();
+        let location = Pubkey::new_unique();
         let device_owner = Pubkey::new_unique();
 
         let data = get_mint_promo_tx::Data {
@@ -481,9 +492,9 @@ pub mod test {
                         "/promo/burn-delegated/{}/{}/{}/{}/{}/{}/{}",
                         mint.to_string(),
                         token_account.to_string(),
-                        location.to_string(),
                         device.to_string(),
                         campaign.to_string(),
+                        location.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
                     ))
@@ -500,10 +511,11 @@ pub mod test {
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
         let instruction = burn_delegated_promo_instruction(
+            platform_signer.pubkey(),
             device_owner,
-            location,
             device,
             campaign,
+            location,
             token_account,
             mint,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
@@ -940,7 +952,6 @@ pub mod test {
         .unwrap();
 
         assert_eq!(instruction.data.name, "Test Campaign".to_string());
-        assert_eq!(instruction.data.locations, vec![location, location2]);
     }
 
     #[tokio::test]

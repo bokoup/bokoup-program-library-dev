@@ -2,9 +2,9 @@ use crate::{AccountMessageData, TransactionMessageData};
 use anchor_lang::{AccountDeserialize, Discriminator};
 use bpl_api_data::{
     queries::bpl_token_metadata::{
-        burn_delegated_promo_token, campaign, create_campaign, create_device, create_location,
-        create_merchant, create_promo, delegate_promo_token, device, location, merchant,
-        mint_promo_token, promo, sign_memo,
+        admin_settings, burn_delegated_promo_token, campaign, create_campaign, create_device,
+        create_location, create_merchant, create_promo, delegate_promo_token, device, location,
+        merchant, mint_promo_token, promo, sign_memo,
     },
     Client,
 };
@@ -20,6 +20,24 @@ async fn process_promo<'a>(
 ) {
     match state::Promo::try_deserialize(buf) {
         Ok(ref account) => promo::upsert(pg_client, key, account, slot, write_version).await,
+        Err(error) => {
+            tracing::error!(id = bs58::encode(key).into_string(), ?error)
+        }
+    }
+}
+
+#[tracing::instrument(skip_all)]
+async fn process_admin_settings<'a>(
+    pg_client: &Client,
+    key: &[u8],
+    buf: &mut &[u8],
+    slot: u64,
+    write_version: u64,
+) {
+    match state::AdminSettings::try_deserialize(buf) {
+        Ok(ref account) => {
+            admin_settings::upsert(pg_client, key, account, slot, write_version).await
+        }
         Err(error) => {
             tracing::error!(id = bs58::encode(key).into_string(), ?error)
         }
@@ -98,7 +116,9 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
 
     let discriminator = &buf[..8];
 
-    if discriminator == state::Merchant::discriminator() {
+    if discriminator == state::AdminSettings::discriminator() {
+        process_admin_settings(&pg_client, key, &mut buf, slot, write_version).await
+    } else if discriminator == state::Merchant::discriminator() {
         process_merchant(&pg_client, key, &mut buf, slot, write_version).await
     } else if discriminator == state::Location::discriminator() {
         process_location(&pg_client, key, &mut buf, slot, write_version).await
@@ -185,6 +205,7 @@ pub async fn process_transaction<'a>(
                 &pg_client,
                 &message.signature,
                 &message.accounts,
+                &message.balances,
                 &message.data,
                 message.slot,
             )
@@ -215,6 +236,7 @@ pub async fn process_transaction<'a>(
                 &pg_client,
                 &message.signature,
                 &message.accounts,
+                &message.balances,
                 &message.data,
                 message.slot,
             )

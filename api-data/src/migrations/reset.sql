@@ -5,6 +5,7 @@ SET check_function_bodies = false;
 -- bpl_token_metadata
 -- =============================
 
+DROP TABLE IF EXISTS public.admin_settings CASCADE;
 DROP TABLE IF EXISTS public.burn_delegated_promo_token CASCADE;
 DROP TABLE IF EXISTS public.campaign CASCADE;
 DROP TABLE IF EXISTS public.create_campaign CASCADE;

@@ -42,7 +42,10 @@ impl<'info> MintPromoToken<'info> {
         )?;
 
         if let Some(memo) = memo {
-            let account_infos = vec![self.payer.to_account_info()];
+            let account_infos = vec![
+                self.token_owner.to_account_info(),
+                self.device_owner.to_account_info(),
+            ];
             create_memo(memo.to_string(), account_infos)?;
         }
 

@@ -50,7 +50,7 @@ impl<'info> CreatePromo<'info> {
             create_memo(memo, account_infos)?;
         }
 
-        *self.promo = promo_data;
+        **self.promo = promo_data;
         Ok(())
     }
 }

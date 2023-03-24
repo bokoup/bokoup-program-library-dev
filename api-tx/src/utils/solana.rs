@@ -10,15 +10,18 @@ use anchor_lang::{
 use bpl_token_metadata::{
     accounts::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_accounts,
-        CreateCampaign as create_campaign_accounts, CreateDevice as create_device_accounts,
-        CreateLocation as create_location_accounts, CreateMerchant as create_merchant_accounts,
-        CreatePromo as create_promo_accounts, DelegatePromoToken as delegate_promo_token_accounts,
+        CreateCampaign as create_campaign_accounts,
+        CreateCampaignLocation as create_campaign_location_accounts,
+        CreateDevice as create_device_accounts, CreateLocation as create_location_accounts,
+        CreateMerchant as create_merchant_accounts, CreatePromo as create_promo_accounts,
+        DelegatePromoToken as delegate_promo_token_accounts,
         MintPromoToken as mint_promo_token_accounts, SignMemo as sign_memo_accounts,
     },
     instruction::{
         BurnDelegatedPromoToken as burn_delegated_promo_token_instruction,
-        CreateCampaign as create_campaign_instruction, CreateDevice as create_device_instruction,
-        CreateLocation as create_location_instruction,
+        CreateCampaign as create_campaign_instruction,
+        CreateCampaignLocation as create_campaign_location_instruction,
+        CreateDevice as create_device_instruction, CreateLocation as create_location_instruction,
         CreateMerchant as create_merchant_instruction, CreatePromo as create_promo_instruction,
         DelegatePromoToken as delegate_promo_token_instruction,
         MintPromoToken as mint_promo_token_instruction, SignMemo as sign_memo_instruction,
@@ -26,8 +29,8 @@ use bpl_token_metadata::{
     state::{Campaign, DataV2, Device, Location, Merchant, Promo},
     utils::{
         find_admin_address, find_associated_token_address, find_authority_address,
-        find_campaign_address, find_device_address, find_location_address, find_merchant_address,
-        find_metadata_address, find_promo_address,
+        find_campaign_address, find_campaign_location_address, find_device_address,
+        find_location_address, find_merchant_address, find_metadata_address, find_promo_address,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -157,20 +160,18 @@ pub fn create_campaign_instruction(
     owner: Pubkey,
     name: String,
     uri: String,
-    locations: Vec<Pubkey>,
     lamports: u64,
+    locations: Vec<Pubkey>,
     active: bool,
     memo: Option<String>,
-) -> Result<Instruction, AppError> {
-    let (merchant, _) = find_merchant_address(&owner);
-
-    let (campaign, _) = find_campaign_address(&merchant, &name);
+) -> Result<Vec<Instruction>, AppError> {
+    let merchant = find_merchant_address(&owner).0;
+    let campaign = find_campaign_address(&merchant, &name).0;
 
     let data = Campaign {
         merchant,
         name,
         uri,
-        locations,
         active,
     };
 
@@ -191,6 +192,47 @@ pub fn create_campaign_instruction(
     }
     .data();
 
+    let mut instructions: Vec<Instruction> = Vec::new();
+
+    instructions.push(Instruction {
+        program_id: bpl_token_metadata::id(),
+        accounts,
+        data,
+    });
+
+    // Create campaign location instructions.
+    for location in locations {
+        let ix = create_campaign_location_instruction(payer, owner, campaign, location, None)?;
+        instructions.push(ix);
+    }
+
+    Ok(instructions)
+}
+
+pub fn create_campaign_location_instruction(
+    payer: Pubkey,
+    owner: Pubkey,
+    campaign: Pubkey,
+    location: Pubkey,
+    memo: Option<String>,
+) -> Result<Instruction, AppError> {
+    let merchant = find_merchant_address(&owner).0;
+    let campaign_location = find_campaign_location_address(&campaign, &location).0;
+
+    let accounts = create_campaign_location_accounts {
+        payer,
+        owner,
+        merchant,
+        campaign,
+        campaign_location,
+        location,
+        memo_program: spl_memo::ID,
+        system_program: system_program::ID,
+    }
+    .to_account_metas(Some(true));
+
+    let data = create_campaign_location_instruction { memo }.data();
+
     Ok(Instruction {
         program_id: bpl_token_metadata::id(),
         accounts,
@@ -200,6 +242,7 @@ pub fn create_campaign_instruction(
 
 pub fn create_promo_instruction(
     payer: Pubkey,
+    owner: Pubkey,
     campaign: Pubkey,
     mint: Pubkey,
     platform: Pubkey,
@@ -216,10 +259,11 @@ pub fn create_promo_instruction(
     let promo = find_promo_address(&mint).0;
     let metadata = find_metadata_address(&mint).0;
     let admin_settings = find_admin_address().0;
-    let merchant = find_merchant_address(&payer).0;
+    let merchant = find_merchant_address(&owner).0;
 
     let accounts = create_promo_accounts {
         payer,
+        owner,
         merchant,
         campaign,
         mint,
@@ -273,10 +317,11 @@ pub fn create_promo_instruction(
 }
 
 pub fn mint_promo_instruction(
+    payer: Pubkey,
     device_owner: Pubkey,
-    location: Pubkey,
     device: Pubkey,
     campaign: Pubkey,
+    location: Pubkey,
     token_owner: Pubkey,
     mint: Pubkey,
     memo: Option<String>,
@@ -284,10 +329,10 @@ pub fn mint_promo_instruction(
     let authority = find_authority_address().0;
     let promo = find_promo_address(&mint).0;
     let token_account = find_associated_token_address(&token_owner, &mint);
+    let campaign_location = find_campaign_location_address(&campaign, &location).0;
 
     tracing::debug!(
         device_owner = device_owner.to_string(),
-        location = location.to_string(),
         device = device.to_string(),
         campaign = campaign.to_string(),
         token_owner = token_owner.to_string(),
@@ -297,10 +342,11 @@ pub fn mint_promo_instruction(
     );
 
     let accounts = mint_promo_token_accounts {
-        payer: device_owner,
-        location,
+        payer,
+        device_owner,
         device,
         campaign,
+        campaign_location,
         token_owner,
         mint,
         authority,
@@ -326,9 +372,9 @@ pub fn mint_promo_instruction(
 pub fn delegate_promo_instruction(
     payer: Pubkey,
     device_owner: Pubkey,
-    location: Pubkey,
     device: Pubkey,
     campaign: Pubkey,
+    campaign_location: Pubkey,
     token_owner: Pubkey,
     mint: Pubkey,
     memo: Option<String>,
@@ -339,9 +385,9 @@ pub fn delegate_promo_instruction(
     let accounts = delegate_promo_token_accounts {
         payer,
         device_owner,
-        location,
         device,
         campaign,
+        campaign_location,
         token_owner,
         mint,
         promo,
@@ -362,9 +408,10 @@ pub fn delegate_promo_instruction(
 }
 
 pub fn burn_delegated_promo_instruction(
+    payer: Pubkey,
     device_owner: Pubkey,
-    location: Pubkey,
     device: Pubkey,
+    location: Pubkey,
     campaign: Pubkey,
     token_account: Pubkey,
     mint: Pubkey,
@@ -374,13 +421,15 @@ pub fn burn_delegated_promo_instruction(
     let authority = find_authority_address().0;
     let promo = find_promo_address(&mint).0;
     let admin_settings = find_admin_address().0;
+    let campaign_location = find_campaign_location_address(&campaign, &location).0;
     // let token_account = find_associated_token_address(&token_owner, &mint);
 
     let accounts = burn_delegated_promo_token_accounts {
-        payer: device_owner,
-        location,
+        payer,
+        device_owner,
         device,
         campaign,
+        campaign_location,
         mint,
         authority,
         promo,

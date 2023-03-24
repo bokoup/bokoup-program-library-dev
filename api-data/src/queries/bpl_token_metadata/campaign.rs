@@ -16,7 +16,6 @@ pub async fn upsert(
 ) {
     let id = bs58::encode(key).into_string();
     let merchant = account.merchant.to_string();
-    let locations = account.locations.iter().map(ToString::to_string).collect();
     let slot = slot as i64;
     let write_version = write_version as i64;
 
@@ -45,7 +44,6 @@ pub async fn upsert(
                 &account.name,
                 &account.uri,
                 &metadata_json,
-                &Json::<Vec<String>>(locations),
                 &account.active,
                 &slot,
                 &write_version,

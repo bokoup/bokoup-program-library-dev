@@ -4,7 +4,7 @@ use mpl_token_metadata::state::{
     UseMethod as UseMethodMpl, Uses as UsesMpl,
 };
 
-use crate::utils::{LOCATIONS_CAPACITY, MAX_NAME_LENGTH, MAX_URI_LENGTH};
+use crate::utils::{MAX_NAME_LENGTH, MAX_URI_LENGTH};
 
 //==============================
 // AdminSettings
@@ -99,7 +99,7 @@ impl Device {
 }
 
 //==============================
-// PromoGroup
+// Campaign
 //==============================
 
 #[account]
@@ -108,12 +108,26 @@ pub struct Campaign {
     pub merchant: Pubkey,
     pub name: String,
     pub uri: String,
-    pub locations: Vec<Pubkey>,
     pub active: bool,
 }
 
 impl Campaign {
-    pub const LEN: usize = 8 + 32 + MAX_NAME_LENGTH + MAX_URI_LENGTH + 32 * LOCATIONS_CAPACITY + 1;
+    pub const LEN: usize = 8 + 32 + MAX_NAME_LENGTH + MAX_URI_LENGTH + 1;
+}
+
+//==============================
+// CampaignLocation
+//==============================
+
+#[account]
+#[derive(Default, Debug)]
+pub struct CampaignLocation {
+    pub campaign: Pubkey,
+    pub location: Pubkey,
+}
+
+impl CampaignLocation {
+    pub const LEN: usize = 8 + 32 + 32;
 }
 
 //==============================
@@ -137,7 +151,7 @@ pub struct Promo {
 
 impl Promo {
     pub const LEN: usize = 8
-    + 32        // owner
+    + 32        // campaign
     + 32        // mint
     + 32        // metadata
     + 4         // mint_count

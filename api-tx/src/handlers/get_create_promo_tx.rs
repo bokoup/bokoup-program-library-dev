@@ -20,12 +20,14 @@ use super::{PayResponse, PromoParams};
 pub async fn handler(
     multipart: Multipart,
     Path(PromoParams {
-        payer,
+        owner,
         campaign,
         memo,
     }): Path<PromoParams>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
+    tracing::debug!(owner = owner, campaign = campaign, memo = memo,);
+
     // Parse data - json data plus optional image. If image data exists it gets
     // uploaded to arweave and an image property added to the json metadata.
     let (mut metadata_data, image_data) = get_metadata(multipart).await?;
@@ -56,12 +58,14 @@ pub async fn handler(
     let (uri, state) = upload_metadata_json(metadata_data_obj, state).await?;
 
     let mint_keypair = Keypair::new();
-
-    let payer = Pubkey::from_str(&payer)?;
+    let payer = state.platform_signer.pubkey();
+    let owner = Pubkey::from_str(&owner)?;
     let campaign = Pubkey::from_str(&campaign)?;
+
     // Create promo instruction.
     let ix = create_promo_instruction(
         payer,
+        owner,
         campaign,
         mint_keypair.pubkey(),
         state.platform,
@@ -77,10 +81,11 @@ pub async fn handler(
 
     let mut tx = Transaction::new_with_payer(&[ix], Some(&payer));
     let latest_blockhash = state.solana.get_latest_blockhash().await?;
-    tx.partial_sign(&[&mint_keypair], latest_blockhash);
+    tx.partial_sign(&[&state.platform_signer, &mint_keypair], latest_blockhash);
 
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);
+
     Ok(Json(PayResponse {
         transaction,
         message: "Create promo".to_string(),

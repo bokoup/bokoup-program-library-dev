@@ -42,8 +42,12 @@ export type Campaign = {
   merchant: PublicKey;
   name: string;
   uri: string;
-  locations: Array<PublicKey>;
   active: boolean;
+};
+
+export type CampaignLocation = {
+  campaign: PublicKey;
+  location: PublicKey;
 };
 
 export type UI<T> = T & {

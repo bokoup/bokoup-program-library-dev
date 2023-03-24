@@ -62,7 +62,7 @@ pub async fn apply_migrations(client: &mut Client) -> Result<(), Error> {
 mod tests {
     use super::*;
     use anchor_spl::associated_token::get_associated_token_address;
-    use bpl_token_metadata::state::{Campaign, Device, Location, Merchant, Promo};
+    use bpl_token_metadata::state::{AdminSettings, Campaign, Device, Location, Merchant, Promo};
     use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
     use mpl_auction_house::{
         pda::{
@@ -95,6 +95,40 @@ mod tests {
     // =============================
     // Accounts
     // =============================
+
+    async fn it_upserts_admin_settings(
+        client: &Client,
+        key: &[u8],
+        account: &AdminSettings,
+        slot: u64,
+        write_version: u64,
+    ) {
+        queries::bpl_token_metadata::admin_settings::upsert(
+            client,
+            key,
+            account,
+            slot,
+            write_version,
+        )
+        .await;
+        let row = client
+            .query_one(
+                "SELECT * FROM admin_settings WHERE id = $1",
+                &[&bs58::encode(key).into_string()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            row.get::<&str, String>("platform"),
+            account.platform.to_string(),
+            "it_upserts_admin_settings: platform failed"
+        );
+        assert_eq!(
+            row.get::<&str, i64>("create_promo_lamports"),
+            account.create_promo_lamports as i64,
+            "it_upserts_admin_settings: create_promo_lamports failed"
+        );
+    }
 
     async fn it_upserts_merchant(
         client: &Client,
@@ -440,13 +474,14 @@ mod tests {
         client: &Client,
         signature: &Signature,
         accounts: &Vec<Pubkey>,
+        balances: &Vec<u64>,
         data: &[u8],
         slot: u64,
         table: &str,
     ) {
         if table == "create_promo" {
             queries::bpl_token_metadata::create_promo::upsert(
-                client, signature, accounts, data, slot,
+                client, signature, accounts, balances, data, slot,
             )
             .await;
         } else if table == "mint_promo_token" {
@@ -461,7 +496,7 @@ mod tests {
             .await;
         } else if table == "burn_delegated_promo_token" {
             queries::bpl_token_metadata::burn_delegated_promo_token::upsert(
-                client, signature, accounts, data, slot,
+                client, signature, accounts, balances, data, slot,
             )
             .await;
         } else if table == "create_campaign" {
@@ -532,6 +567,7 @@ mod tests {
         // insert transactions
         let data: &[u8] = &[0; 8];
         let accounts: Vec<Pubkey> = (0..12).map(|_| Pubkey::new_unique()).collect();
+        let balances: Vec<u64> = (0..12).map(|i| i).collect();
 
         for table in vec![
             "create_merchant",
@@ -543,9 +579,33 @@ mod tests {
             "delegate_promo_token",
             "burn_delegated_promo_token",
         ] {
-            it_upserts_transaction(&client, &Signature::default(), &accounts, data, 42, table)
-                .await;
+            it_upserts_transaction(
+                &client,
+                &Signature::default(),
+                &accounts,
+                &balances,
+                data,
+                42,
+                table,
+            )
+            .await;
         }
+
+        // upsert admin_settings
+
+        let admin_settings = AdminSettings {
+            platform: Pubkey::new_unique(),
+            create_promo_lamports: 42,
+            burn_promo_token_lamports: 69,
+        };
+        it_upserts_admin_settings(
+            &client,
+            Pubkey::new_unique().as_ref(),
+            &admin_settings,
+            42,
+            1,
+        )
+        .await;
 
         // upsert merchant
 

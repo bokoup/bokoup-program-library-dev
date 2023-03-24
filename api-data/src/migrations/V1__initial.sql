@@ -5,6 +5,19 @@ SET check_function_bodies = false;
 -- bpl_token_metadata
 -- =============================
 
+CREATE TABLE public.admin_settings (
+    id text NOT NULL,
+    platform text NOT NULL,
+    create_promo_lamports bigint NOT NULL,
+    burn_promo_token_lamports bigint NOT NULL,
+    slot bigint NOT NULL,
+    write_version bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.admin_settings
+    ADD CONSTRAINT admin_settings_pkey PRIMARY KEY (id);
+
 CREATE TABLE public.merchant (
     id text NOT NULL,
     owner text NOT NULL,
@@ -51,13 +64,11 @@ CREATE TABLE public.device (
 ALTER TABLE ONLY public.device
     ADD CONSTRAINT device_pkey PRIMARY KEY (id);
 
-
 CREATE TABLE public.campaign (
     id text NOT NULL,
     merchant text NOT NULL,
     name text NOT NULL,
     uri text NOT NULL,
-    locations jsonb NOT NULL,
     metadata_json jsonb,
     active boolean NOT NULL,
     slot bigint NOT NULL,
@@ -67,6 +78,18 @@ CREATE TABLE public.campaign (
 );
 ALTER TABLE ONLY public.campaign
     ADD CONSTRAINT campaign_pkey PRIMARY KEY (id);
+
+CREATE TABLE public.campaign_location (
+    id text NOT NULL,
+    campaign text NOT NULL,
+    location text NOT NULL,
+    slot bigint NOT NULL,
+    write_version bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    modified_at timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE ONLY public.campaign_location
+    ADD CONSTRAINT campaign_location_pkey PRIMARY KEY (id);
 
 CREATE TABLE public.promo (
     id text NOT NULL,
@@ -145,13 +168,18 @@ ALTER TABLE ONLY public.create_campaign
 CREATE TABLE public.create_promo (
     signature text NOT NULL,
     payer text NOT NULL,
+    payer_balance bigint NOT NULL,
+    owner text NOT NULL,
+    owner_balance bigint NOT NULL,
     merchant text NOT NULL,
     campaign text NOT NULL,
+    campaign_balance bigint NOT NULL,
     mint text NOT NULL,
     metadata text NOT NULL,
     authority text NOT NULL,
     promo text NOT NULL,
     platform text NOT NULL,
+    platform_balance bigint NOT NULL,
     admin_settings text NOT NULL,
     memo jsonb,
     slot bigint NOT NULL,
@@ -202,13 +230,16 @@ ALTER TABLE ONLY public.delegate_promo_token
 CREATE TABLE public.burn_delegated_promo_token (
     signature text NOT NULL,
     payer text NOT NULL,
+    payer_balance bigint NOT NULL,
     location text NOT NULL,
     device text NOT NULL,
     campaign text NOT NULL,
+    campaign_balance bigint NOT NULL,
     mint text NOT NULL,
     authority text NOT NULL,
     promo text NOT NULL,
     platform text NOT NULL,
+    platform_balance bigint NOT NULL,
     admin_settings text NOT NULL,
     token_account text NOT NULL,
     memo jsonb,

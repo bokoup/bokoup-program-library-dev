@@ -70,11 +70,11 @@ pub async fn handler(
     // Upload metadata json to Arweave.
     let (uri, state) = upload_metadata_json(metadata_data_obj, state).await?;
 
-    // Create location instruction.
-    let ix =
-        create_campaign_instruction(payer, owner, name, uri, locations, lamports, active, memo)?;
+    // Create campaign instruction.
+    let instructions =
+        create_campaign_instruction(payer, owner, name, uri, lamports, locations, active, memo)?;
 
-    let mut tx = Transaction::new_with_payer(&[ix], Some(&payer));
+    let mut tx = Transaction::new_with_payer(&instructions, Some(&payer));
     let latest_blockhash = &state.solana.get_latest_blockhash().await?;
     tx.try_partial_sign(&[&state.platform_signer], latest_blockhash.clone())?;
 

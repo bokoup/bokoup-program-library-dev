@@ -12,6 +12,7 @@ import {
   PromoExtended,
   AuctionHouseProgram,
   Merchant,
+  CampaignLocation,
 } from '../src';
 import { PublicKey, Keypair, Transaction, Connection } from '@solana/web3.js';
 import chai = require('chai');
@@ -72,6 +73,7 @@ describe('promo', () => {
   let location: PublicKey;
   let device: PublicKey;
   let campaign: PublicKey;
+  let campaignLocation: PublicKey;
 
   const deviceOwner = Keypair.fromSecretKey(
     new Uint8Array(JSON.parse(process.env.DEVICE_OWNER_KEYPAIR)),
@@ -191,12 +193,14 @@ describe('promo', () => {
     const uri = 'https://campaign.example.com';
     const memo = 'Created a new campaign';
 
+    const merchantOwnerBalanceStarting =
+      await tokenMetadataProgram.program.provider.connection.getBalance(merchantOwner.publicKey);
+
     let _ = '';
     [_, campaign] = await tokenMetadataProgramMerchantOwner.createCampaign(
       platformSigner,
       name,
       uri,
-      [location],
       true,
       500_000_000,
       memo,
@@ -210,13 +214,30 @@ describe('promo', () => {
       campaign,
     );
 
-    expect(accountInfo?.lamports).to.equal(505_240_880);
+    expect(accountInfo?.lamports).to.equal(503_013_680);
 
     const merchantOwnerBalance = await tokenMetadataProgram.program.provider.connection.getBalance(
       merchantOwner.publicKey,
     );
 
-    expect(merchantOwnerBalance).to.equal(499_970_000);
+    expect(merchantOwnerBalanceStarting - merchantOwnerBalance).to.equal(500_010_000);
+  });
+
+  it('creates campaign location', async () => {
+    let _ = '';
+    [_, campaignLocation] = await tokenMetadataProgramMerchantOwner.createCampaignLocation(
+      platformSigner,
+      campaign,
+      location,
+      null,
+    );
+
+    const account = (await tokenMetadataProgram.program.account.campaignLocation.fetch(
+      campaignLocation,
+    )) as CampaignLocation;
+
+    expect(account.campaign.toString()).to.equal(campaign.toString());
+    expect(account.location.toString()).to.equal(location.toString());
   });
 
   it('transfers cpi', async () => {
@@ -224,7 +245,6 @@ describe('promo', () => {
       .transferCpi(1_000_000)
       .accounts({
         merchant,
-        location,
         device,
         campaign,
         platform: adminSettingsAccount.platform,
@@ -269,6 +289,7 @@ describe('promo', () => {
       };
 
       mint = await tokenMetadataProgramMerchantOwner.createPromo(
+        platformSigner,
         metadataData,
         campaign,
         true,
@@ -299,7 +320,14 @@ describe('promo', () => {
   // of their membership in the group that owns the promo.
   it('Mints a promo token', async () => {
     const [tokenAccountAccount, mintAccount] = await tokenMetadataProgram
-      .mintPromoToken(mint, deviceOwner, location, device, campaign, 'just a string for a memo')
+      .mintPromoToken(
+        platformSigner,
+        mint,
+        deviceOwner,
+        device,
+        campaign,
+        'just a string for a memo',
+      )
       .then((tokenAccount) =>
         Promise.all([
           tokenMetadataProgram.getTokenAccount(tokenAccount),
@@ -326,14 +354,7 @@ describe('promo', () => {
     };
 
     const tokenAccountAccount = await tokenMetadataProgram
-      .delegatePromoToken(
-        mint,
-        deviceOwner.publicKey,
-        location,
-        device,
-        campaign,
-        JSON.stringify(memo),
-      )
+      .delegatePromoToken(mint, deviceOwner.publicKey, device, campaign, JSON.stringify(memo))
       .then((tokenAccount) => tokenMetadataProgram.getTokenAccount(tokenAccount));
     expect(Number(tokenAccountAccount.delegatedAmount)).to.equal(1, 'Delegated amount incorrect.');
     console.log('tokenAccountAccount: ', tokenAccountAccount);
@@ -356,7 +377,6 @@ describe('promo', () => {
 
     await tokenMetadataProgramDeviceOwner.burnDelegatedPromoToken(
       mint,
-      location,
       device,
       campaign,
       tokenOwner,
@@ -416,7 +436,14 @@ describe('promo', () => {
     const tokenSize = 1;
 
     await tokenMetadataProgram
-      .mintPromoToken(mint, deviceOwner, location, device, campaign, 'just a string for a memo')
+      .mintPromoToken(
+        platformSigner,
+        mint,
+        deviceOwner,
+        device,
+        campaign,
+        'just a string for a memo',
+      )
       .then((tokenAccount) =>
         Promise.all([
           tokenMetadataProgram.getTokenAccount(tokenAccount),

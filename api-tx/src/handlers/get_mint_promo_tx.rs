@@ -1,52 +1,58 @@
 use super::PayResponse;
-use crate::{error::AppError, handlers::MintParams, utils::solana::mint_promo_instruction};
+use crate::{error::AppError, handlers::MintParams, utils::solana::mint_promo_instruction, State};
 use anchor_lang::prelude::Pubkey;
-use axum::{extract::Path, Json};
+use axum::{extract::Path, Extension, Json};
 use serde::{Deserialize, Serialize};
-use solana_sdk::transaction::Transaction;
-use std::str::FromStr;
+use solana_sdk::{signer::Signer, transaction::Transaction};
+use std::{str::FromStr, sync::Arc};
 
 pub async fn handler(
     Json(data): Json<Data>,
     Path(MintParams {
         mint,
-        location,
         device,
+        device_owner,
+        location,
         campaign,
-        token_owner,
         message,
         memo,
     }): Path<MintParams>,
+    Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(
         mint = mint,
-        location = location,
         device = device,
         campaign = campaign,
         message = message,
         memo = memo
     );
 
-    let device_owner = Pubkey::from_str(&data.account)?;
+    let payer = state.platform_signer.pubkey();
+    let device_owner = Pubkey::from_str(&device_owner)?;
     let mint = Pubkey::from_str(&mint)?;
-    let location = Pubkey::from_str(&location)?;
     let device = Pubkey::from_str(&device)?;
     let campaign = Pubkey::from_str(&campaign)?;
-    let token_owner = Pubkey::from_str(&token_owner)?;
+    let location = Pubkey::from_str(&location)?;
+    let token_owner = Pubkey::from_str(&data.account)?;
 
     let instruction = mint_promo_instruction(
+        payer,
         device_owner,
-        location,
         device,
         campaign,
+        location,
         token_owner,
         mint,
         memo,
     )?;
 
-    let tx = Transaction::new_with_payer(&[instruction], Some(&device_owner));
-    // let latest_blockhash = state.solana.get_latest_blockhash().await?;
-    // tx.try_partial_sign(&[&state.platform_signer], latest_blockhash)?;
+    let mut tx = Transaction::new_with_payer(&[instruction], Some(&payer));
+
+    // platform signer always signs the transactions and includes signature as device owner if device owner
+    // is platform signer.
+    let latest_blockhash = state.solana.get_latest_blockhash().await?;
+    tx.try_partial_sign(&[&state.platform_signer], latest_blockhash)?;
+
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);
 

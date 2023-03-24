@@ -14,10 +14,10 @@ pub mod get_sign_memo_tx;
 #[derive(Deserialize, Debug)]
 pub struct MintParams {
     pub mint: String,
-    pub location: String,
     pub device: String,
+    pub device_owner: String,
+    pub location: String,
     pub campaign: String,
-    pub token_owner: String,
     pub message: String,
     pub memo: Option<String>,
 }
@@ -26,8 +26,8 @@ pub struct MintParams {
 pub struct DelegateParams {
     pub mint: String,
     pub device_owner: String,
-    pub location: String,
     pub device: String,
+    pub location: String,
     pub campaign: String,
     pub message: String,
     pub memo: Option<String>,
@@ -37,8 +37,8 @@ pub struct DelegateParams {
 pub struct BurnDelegatedParams {
     pub mint: String,
     pub token_account: String,
-    pub location: String,
     pub device: String,
+    pub location: String,
     pub campaign: String,
     pub message: String,
     pub memo: Option<String>,
@@ -46,7 +46,7 @@ pub struct BurnDelegatedParams {
 
 #[derive(Deserialize, Debug)]
 pub struct PromoParams {
-    pub payer: String,
+    pub owner: String,
     pub campaign: String,
     pub memo: Option<String>,
 }

@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use solana_sdk::transaction::Transaction;
+use solana_sdk::{signer::Signer, transaction::Transaction};
 use std::{str::FromStr, sync::Arc};
 
 use crate::{error::AppError, utils::solana::burn_delegated_promo_instruction, State};
@@ -16,26 +16,28 @@ pub async fn handler(
     Path(BurnDelegatedParams {
         mint,
         token_account,
-        location,
         device,
+        location,
         campaign,
         message,
         memo,
     }): Path<BurnDelegatedParams>,
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<PayResponse>, AppError> {
+    let payer = state.platform_signer.pubkey();
     let device_owner = Pubkey::from_str(&data.account)?;
     let mint = Pubkey::from_str(&mint)?;
     let token_account = Pubkey::from_str(&token_account)?;
-    let location = Pubkey::from_str(&location)?;
     let device = Pubkey::from_str(&device)?;
+    let location = Pubkey::from_str(&location)?;
     let campaign = Pubkey::from_str(&campaign)?;
     let platform = state.platform;
 
     let instruction = burn_delegated_promo_instruction(
+        payer,
         device_owner,
-        location,
         device,
+        location,
         campaign,
         token_account,
         mint,

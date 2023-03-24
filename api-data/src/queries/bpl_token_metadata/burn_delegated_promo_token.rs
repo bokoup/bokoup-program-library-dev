@@ -10,6 +10,7 @@ pub async fn upsert(
     client: &Client,
     signature: &Signature,
     accounts: &Vec<Pubkey>,
+    balances: &Vec<u64>,
     data: &[u8],
     slot: u64,
 ) {
@@ -41,19 +42,26 @@ pub async fn upsert(
     let token_account = &accounts[9];
     let slot = slot as i64;
 
+    let payer_balance = balances[0] as i64;
+    let campaign_balance = balances[3] as i64;
+    let platform_balance = balances[7] as i64;
+
     let result = client
         .query_one(
             UPSERT_QUERY,
             &[
                 &signature,
                 payer,
+                &payer_balance,
                 location,
                 device,
                 campaign,
+                &campaign_balance,
                 mint,
                 authority,
                 promo,
                 platform,
+                &platform_balance,
                 admin_settings,
                 token_account,
                 &Json::<Option<serde_json::Value>>(memo),

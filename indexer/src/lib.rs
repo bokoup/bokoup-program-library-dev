@@ -17,6 +17,7 @@ pub struct TransactionMessageData {
     pub signature: Signature,
     pub program_id: Pubkey,
     pub accounts: Vec<Pubkey>,
+    pub balances: Vec<u64>,
     pub data: Vec<u8>,
     pub slot: u64,
 }

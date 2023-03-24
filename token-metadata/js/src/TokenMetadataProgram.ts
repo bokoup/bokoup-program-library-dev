@@ -24,6 +24,7 @@ import {
   Device,
   Location,
   Merchant,
+  CampaignLocation,
 } from '.';
 const camelcaseKeysDeep = require('camelcase-keys-deep');
 
@@ -41,6 +42,7 @@ export class TokenMetadataProgram {
   readonly LOCATION_PREFIX: string;
   readonly DEVICE_PREFIX: string;
   readonly CAMPAIGN_PREFIX: string;
+  readonly CAMPAIGN_LOCATION_PREFIX: string;
   readonly PROMO_PREFIX: string;
   readonly METADATA_PREFIX: string;
   readonly EDITION_PREFIX: string;
@@ -63,6 +65,7 @@ export class TokenMetadataProgram {
     this.LOCATION_PREFIX = 'location';
     this.DEVICE_PREFIX = 'device';
     this.CAMPAIGN_PREFIX = 'campaign';
+    this.CAMPAIGN_LOCATION_PREFIX = 'campaign_location';
     this.PROMO_PREFIX = 'promo';
     this.METADATA_PREFIX = 'metadata';
     this.EDITION_PREFIX = 'edition';
@@ -199,7 +202,6 @@ export class TokenMetadataProgram {
     payer: Keypair,
     name: string,
     uri: string,
-    locations: Array<PublicKey>,
     active: boolean,
     lamports: number,
     memo: string | null,
@@ -211,7 +213,6 @@ export class TokenMetadataProgram {
       merchant,
       name,
       uri,
-      locations,
       active,
     };
 
@@ -227,6 +228,30 @@ export class TokenMetadataProgram {
       .signers([payer])
       .rpc();
     return [tx, campaign];
+  }
+
+  async createCampaignLocation(
+    payer: Keypair,
+    campaign: PublicKey,
+    location: PublicKey,
+    memo: string | null,
+  ): Promise<[string, PublicKey]> {
+    const merchant = this.findMerchantAddress(this.payer.publicKey);
+    const campaignLocation = this.findCampaignLocationAddress(campaign, location);
+
+    const tx = await this.program.methods
+      .createCampaignLocation(memo)
+      .accounts({
+        payer: payer.publicKey,
+        owner: this.payer.publicKey,
+        merchant,
+        campaign,
+        location,
+        memoProgram: this.MEMO_PROGRAM_ID,
+      })
+      .signers([payer])
+      .rpc();
+    return [tx, campaignLocation];
   }
 
   /**
@@ -255,6 +280,7 @@ export class TokenMetadataProgram {
    * @return Address of promo account
    */
   async createPromo(
+    payer: Keypair,
     metadataData: DataV2,
     campaign: PublicKey,
     isMutable: boolean,
@@ -281,6 +307,8 @@ export class TokenMetadataProgram {
     await this.program.methods
       .createPromo(promoData, metadataData, isMutable, memo)
       .accounts({
+        payer: payer.publicKey,
+        owner: this.payer.publicKey,
         merchant,
         campaign,
         mint: mint.publicKey,
@@ -289,7 +317,7 @@ export class TokenMetadataProgram {
         metadataProgram: this.TOKEN_METADATA_PROGRAM_ID,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
-      .signers([mint])
+      .signers([mint, payer])
       .rpc();
 
     return mint.publicKey;
@@ -304,9 +332,9 @@ export class TokenMetadataProgram {
    * @return Address of token account account
    */
   async mintPromoToken(
+    payer: Keypair,
     mint: PublicKey,
     deviceOwner: Keypair,
-    location: PublicKey,
     device: PublicKey,
     campaign: PublicKey,
     memo: string | null,
@@ -316,8 +344,8 @@ export class TokenMetadataProgram {
     await this.program.methods
       .mintPromoToken(memo)
       .accounts({
-        payer: deviceOwner.publicKey,
-        location,
+        payer: payer.publicKey,
+        deviceOwner: deviceOwner.publicKey,
         device,
         campaign,
         tokenOwner: this.payer.publicKey,
@@ -325,7 +353,7 @@ export class TokenMetadataProgram {
         tokenAccount,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
-      .signers([deviceOwner, this.payer.payer])
+      .signers([payer, deviceOwner, this.payer.payer])
       .rpc();
 
     return tokenAccount;
@@ -341,7 +369,6 @@ export class TokenMetadataProgram {
   async delegatePromoToken(
     mint: PublicKey,
     deviceOwner: PublicKey,
-    location: PublicKey,
     device: PublicKey,
     campaign: PublicKey,
     memo: string | null,
@@ -352,7 +379,6 @@ export class TokenMetadataProgram {
       .delegatePromoToken(memo)
       .accounts({
         deviceOwner,
-        location,
         device,
         campaign,
         tokenOwner: this.payer.publicKey,
@@ -376,7 +402,6 @@ export class TokenMetadataProgram {
   // no promo owner as signer for demo
   async burnDelegatedPromoToken(
     mint: PublicKey,
-    location: PublicKey,
     device: PublicKey,
     campaign: PublicKey,
     tokenOwner: PublicKey,
@@ -388,7 +413,6 @@ export class TokenMetadataProgram {
     await this.program.methods
       .burnDelegatedPromoToken(memo)
       .accounts({
-        location,
         device,
         campaign,
         mint,
@@ -572,6 +596,13 @@ export class TokenMetadataProgram {
   findCampaignAddress(merchant: PublicKey, name: string): PublicKey {
     return PublicKey.findProgramAddressSync(
       [Buffer.from(this.CAMPAIGN_PREFIX), merchant.toBuffer(), Buffer.from(name)],
+      this.PUBKEY,
+    )[0];
+  }
+
+  findCampaignLocationAddress(campaign: PublicKey, location: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from(this.CAMPAIGN_LOCATION_PREFIX), campaign.toBuffer(), location.toBuffer()],
       this.PUBKEY,
     )[0];
   }
