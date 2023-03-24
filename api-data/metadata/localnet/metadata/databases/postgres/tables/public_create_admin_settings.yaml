@@ -1,0 +1,3 @@
+table:
+  name: create_admin_settings
+  schema: public

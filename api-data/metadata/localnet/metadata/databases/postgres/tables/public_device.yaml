@@ -27,3 +27,4 @@ select_permissions:
         - created_at
         - modified_at
       filter: {}
+      allow_aggregations: true

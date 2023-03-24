@@ -1,6 +1,16 @@
 table:
   name: sign_memo
   schema: public
+object_relationships:
+  - name: merchantObject
+    using:
+      manual_configuration:
+        column_mapping:
+          signer: owner
+        insertion_order: null
+        remote_table:
+          name: merchant
+          schema: public
 select_permissions:
   - role: public
     permission:

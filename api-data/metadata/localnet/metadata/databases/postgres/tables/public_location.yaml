@@ -11,6 +11,25 @@ object_relationships:
         remote_table:
           name: merchant
           schema: public
+array_relationships:
+  - name: campaignLocations
+    using:
+      manual_configuration:
+        column_mapping:
+          id: location
+        insertion_order: null
+        remote_table:
+          name: campaign_location
+          schema: public
+  - name: devices
+    using:
+      manual_configuration:
+        column_mapping:
+          id: location
+        insertion_order: null
+        remote_table:
+          name: device
+          schema: public
 select_permissions:
   - role: public
     permission:
