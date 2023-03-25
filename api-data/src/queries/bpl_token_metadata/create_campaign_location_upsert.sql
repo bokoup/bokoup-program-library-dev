@@ -17,7 +17,6 @@ ON CONFLICT ON CONSTRAINT create_campaign_location_pkey DO UPDATE
         merchant = EXCLUDED.merchant,
         campaign = EXCLUDED.campaign,
         location = EXCLUDED.location,
-        campaign_location = EXCLUDED.campaign_location,
         memo = EXCLUDED.memo,
         slot = EXCLUDED.slot,
         modified_at = NOW()

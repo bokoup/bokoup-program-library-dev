@@ -195,7 +195,7 @@ CREATE TABLE public.create_campaign_location (
     modified_at timestamp with time zone DEFAULT now() NOT NULL
 );
 ALTER TABLE ONLY public.create_campaign_location
-    ADD CONSTRAINT create_campaign_location_pkey PRIMARY KEY (signature);
+    ADD CONSTRAINT create_campaign_location_pkey PRIMARY KEY (signature, campaign_location);
 
 CREATE TABLE public.create_promo (
     signature text NOT NULL,

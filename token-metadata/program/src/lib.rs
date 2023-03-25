@@ -414,7 +414,6 @@ pub struct MintPromoToken<'info> {
     )]
     pub campaign: Box<Account<'info, Campaign>>,
     #[account(mut,
-        constraint = campaign.key() == promo.campaign,
         constraint = campaign.key() == campaign_location.campaign,
     )]
     #[account(seeds = [CAMPAIGN_LOCATION_PREFIX.as_bytes(), campaign.key().as_ref(), device.location.as_ref()], bump)]

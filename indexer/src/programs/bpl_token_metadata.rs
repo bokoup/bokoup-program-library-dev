@@ -2,7 +2,8 @@ use crate::{AccountMessageData, TransactionMessageData};
 use anchor_lang::{AccountDeserialize, Discriminator};
 use bpl_api_data::{
     queries::bpl_token_metadata::{
-        admin_settings, burn_delegated_promo_token, campaign, create_campaign, create_device,
+        admin_settings, burn_delegated_promo_token, campaign, campaign_location,
+        create_admin_settings, create_campaign, create_campaign_location, create_device,
         create_location, create_merchant, create_promo, delegate_promo_token, device, location,
         merchant, mint_promo_token, promo, sign_memo,
     },
@@ -108,6 +109,24 @@ async fn process_campaign<'a>(
     }
 }
 
+#[tracing::instrument(skip_all)]
+async fn process_campaign_location<'a>(
+    pg_client: &Client,
+    key: &[u8],
+    buf: &mut &[u8],
+    slot: u64,
+    write_version: u64,
+) {
+    match state::CampaignLocation::try_deserialize(buf) {
+        Ok(ref account) => {
+            campaign_location::upsert(pg_client, key, account, slot, write_version).await
+        }
+        Err(error) => {
+            tracing::error!(id = bs58::encode(key).into_string(), ?error)
+        }
+    }
+}
+
 pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountMessageData<'a>) {
     let key = message.account.pubkey.as_ref();
     let mut buf = message.account.data.as_ref();
@@ -126,6 +145,8 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
         process_device(&pg_client, key, &mut buf, slot, write_version).await
     } else if discriminator == state::Campaign::discriminator() {
         process_campaign(&pg_client, key, &mut buf, slot, write_version).await
+    } else if discriminator == state::CampaignLocation::discriminator() {
+        process_campaign_location(&pg_client, key, &mut buf, slot, write_version).await
     } else if discriminator == state::Promo::discriminator() {
         process_promo(&pg_client, key, &mut buf, slot, write_version).await
     } else {
@@ -137,10 +158,12 @@ pub async fn process<'a>(pg_client: deadpool_postgres::Object, message: AccountM
 pub struct Discriminatorio;
 
 impl Discriminatorio {
+    pub const CREATE_ADMIN_SETTINGS: [u8; 8] = [122, 229, 242, 6, 66, 19, 86, 127];
     pub const CREATE_MERCHANT: [u8; 8] = [249, 172, 245, 100, 32, 117, 97, 156];
     pub const CREATE_LOCATION: [u8; 8] = [46, 89, 192, 49, 76, 189, 44, 8];
     pub const CREATE_DEVICE: [u8; 8] = [56, 101, 5, 177, 25, 113, 80, 174];
     pub const CREATE_CAMPAIGN: [u8; 8] = [111, 131, 187, 98, 160, 193, 114, 244];
+    pub const CREATE_CAMPAIGN_LOCATION: [u8; 8] = [82, 9, 70, 52, 189, 11, 188, 239];
     pub const CREATE_PROMO: [u8; 8] = [135, 231, 68, 194, 63, 31, 192, 82];
     pub const MINT_PROMO_TOKEN: [u8; 8] = [75, 139, 89, 205, 32, 105, 163, 161];
     pub const DELEGATE_PROMO_TOKEN: [u8; 8] = [85, 206, 226, 194, 207, 166, 164, 22];
@@ -156,6 +179,16 @@ pub async fn process_transaction<'a>(
     let discriminator = message.data[..8].try_into().unwrap_or([0; 8]);
 
     match discriminator {
+        Discriminatorio::CREATE_ADMIN_SETTINGS => {
+            create_admin_settings::upsert(
+                &pg_client,
+                &message.signature,
+                &message.accounts,
+                &message.data,
+                message.slot,
+            )
+            .await
+        }
         Discriminatorio::CREATE_MERCHANT => {
             create_merchant::upsert(
                 &pg_client,
@@ -191,6 +224,17 @@ pub async fn process_transaction<'a>(
 
         Discriminatorio::CREATE_CAMPAIGN => {
             create_campaign::upsert(
+                &pg_client,
+                &message.signature,
+                &message.accounts,
+                &message.data,
+                message.slot,
+            )
+            .await
+        }
+
+        Discriminatorio::CREATE_CAMPAIGN_LOCATION => {
+            create_campaign_location::upsert(
                 &pg_client,
                 &message.signature,
                 &message.accounts,

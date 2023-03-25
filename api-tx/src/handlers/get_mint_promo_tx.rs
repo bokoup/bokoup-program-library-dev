@@ -22,6 +22,8 @@ pub async fn handler(
     tracing::debug!(
         mint = mint,
         device = device,
+        device_owner = device_owner,
+        location = location,
         campaign = campaign,
         message = message,
         memo = memo
@@ -39,18 +41,17 @@ pub async fn handler(
         payer,
         device_owner,
         device,
-        campaign,
         location,
+        campaign,
         token_owner,
         mint,
         memo,
     )?;
 
     let mut tx = Transaction::new_with_payer(&[instruction], Some(&payer));
-
-    // platform signer always signs the transactions and includes signature as device owner if device owner
-    // is platform signer.
     let latest_blockhash = state.solana.get_latest_blockhash().await?;
+
+    // platform_signer signs as payer and also as device_owner if device_owner is platform_signer.
     tx.try_partial_sign(&[&state.platform_signer], latest_blockhash)?;
 
     let serialized = bincode::serialize(&tx)?;
