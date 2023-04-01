@@ -376,10 +376,13 @@ describe('promo', () => {
     };
 
     await tokenMetadataProgramDeviceOwner.burnDelegatedPromoToken(
-      mint,
+      platformSigner,
+      deviceOwner,
       device,
+      location,
       campaign,
       tokenOwner,
+      mint,
       platform.publicKey,
       JSON.stringify(memo),
     );

@@ -376,13 +376,14 @@ pub fn delegate_promo_instruction(
     device_owner: Pubkey,
     device: Pubkey,
     campaign: Pubkey,
-    campaign_location: Pubkey,
+    location: Pubkey,
     token_owner: Pubkey,
     mint: Pubkey,
     memo: Option<String>,
 ) -> Result<Instruction, AppError> {
-    let (promo, _promo_bump) = find_promo_address(&mint);
+    let promo = find_promo_address(&mint).0;
     let token_account = find_associated_token_address(&token_owner, &mint);
+    let campaign_location = find_campaign_location_address(&campaign, &location).0;
 
     let accounts = delegate_promo_token_accounts {
         payer,

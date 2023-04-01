@@ -401,10 +401,13 @@ export class TokenMetadataProgram {
    */
   // no promo owner as signer for demo
   async burnDelegatedPromoToken(
-    mint: PublicKey,
+    platformSigner: Keypair,
+    deviceOwner: Keypair,
     device: PublicKey,
+    location: PublicKey,
     campaign: PublicKey,
     tokenOwner: PublicKey,
+    mint: PublicKey,
     platform: PublicKey,
     memo: string | null,
   ): Promise<PublicKey> {
@@ -413,13 +416,17 @@ export class TokenMetadataProgram {
     await this.program.methods
       .burnDelegatedPromoToken(memo)
       .accounts({
+        payer: platformSigner.publicKey,
+        deviceOwner: deviceOwner.publicKey,
         device,
+        location,
         campaign,
+        tokenAccount,
         mint,
         platform,
-        tokenAccount,
         memoProgram: this.MEMO_PROGRAM_ID,
       })
+      .signers([platformSigner, deviceOwner])
       .rpc();
 
     return tokenAccount;
