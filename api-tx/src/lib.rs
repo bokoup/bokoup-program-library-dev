@@ -6,7 +6,7 @@ use axum::{
     Router,
 };
 use bundlr_sdk::{Bundlr, Ed25519Signer};
-use ed25519_dalek::Keypair as DalekKeypair;
+use ed25519_dalek::SigningKey as DalekKeypair;
 use handlers::*;
 use solana_sdk::{commitment_config::CommitmentLevel, pubkey::Pubkey, signer::keypair::Keypair};
 use std::{borrow::Cow, sync::Arc, time::Duration};
@@ -53,7 +53,7 @@ impl State {
         platform_signer: Keypair,
         data_url: Url,
     ) -> Self {
-        let keypair = DalekKeypair::from_bytes(&platform_signer.to_bytes()).unwrap();
+        let keypair = DalekKeypair::from_bytes(&platform_signer.secret().to_bytes());
         let signer = Ed25519Signer::new(keypair);
 
         Self {
@@ -341,8 +341,8 @@ pub mod test {
             platform_signer.pubkey(),
             device_owner,
             device,
-            campaign,
             location,
+            campaign,
             token_owner,
             mint,
             Some(memo.to_string()),
@@ -493,8 +493,8 @@ pub mod test {
                         mint.to_string(),
                         token_account.to_string(),
                         device.to_string(),
-                        campaign.to_string(),
                         location.to_string(),
+                        campaign.to_string(),
                         message.into_owned(),
                         memo_encoded.into_owned()
                     ))
@@ -510,12 +510,17 @@ pub mod test {
         let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
         let parsed_response: PayResponse = serde_json::from_slice(&body).unwrap();
 
+        let txd: Transaction = bincode::deserialize(
+            &base64::decode::<String>(parsed_response.transaction.clone()).unwrap(),
+        )
+        .unwrap();
+
         let instruction = burn_delegated_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
             device,
-            campaign,
             location,
+            campaign,
             token_account,
             mint,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
@@ -523,7 +528,11 @@ pub mod test {
         )
         .unwrap();
 
-        let tx = Transaction::new_with_payer(&[instruction], Some(&device_owner));
+        let mut tx = Transaction::new_with_payer(&[instruction], Some(&platform_signer.pubkey()));
+        let recent_blockhash = txd.message.recent_blockhash;
+
+        tx.try_partial_sign(&[&platform_signer], recent_blockhash)
+            .unwrap();
         let serialized = bincode::serialize(&tx).unwrap();
         let transaction = base64::encode(serialized);
 

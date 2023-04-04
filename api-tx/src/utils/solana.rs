@@ -791,7 +791,7 @@ impl std::fmt::Display for Cluster {
 impl Cluster {
     pub fn url(&self) -> &str {
         match self {
-            Cluster::Devnet => "https://api.devnet.solana.com",
+            Cluster::Devnet => "https://purple-fragrant-dust.solana-mainnet.quiknode.pro/c020b41c62e2d7d6bbee10c7435c85133a0e6bfc",
             Cluster::Testnet => "https://api.testnet.solana.com",
             Cluster::Mainnet => "https://api.mainnet-beta.solana.com",
             Cluster::Localnet => "http://127.0.0.1:8899",
@@ -801,7 +801,7 @@ impl Cluster {
     }
     pub fn ws_url(&self) -> &str {
         match self {
-            Cluster::Devnet => "wss://api.devnet.solana.com",
+            Cluster::Devnet => "wss://purple-fragrant-dust.solana-mainnet.quiknode.pro/c020b41c62e2d7d6bbee10c7435c85133a0e6bfc",
             Cluster::Testnet => "wss://api.testnet.solana.com",
             Cluster::Mainnet => "wss://api.mainnet-beta.solana.com",
             Cluster::Localnet => "ws://127.0.0.1:9000",

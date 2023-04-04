@@ -1,4 +1,4 @@
-FROM rust as build-env
+FROM rust:1.66.1 as build-env
 COPY token-metadata/program /token-metadata/program
 COPY api-tx /app
 WORKDIR /app

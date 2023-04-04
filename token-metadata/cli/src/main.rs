@@ -10,7 +10,7 @@ use anchor_client::{
 use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}, utils::{self, find_campaign_address, find_merchant_address}};
 use bundlr_sdk::{tags::Tag, Bundlr, Ed25519Signer};
 use clap::{Parser, Subcommand, ArgEnum};
-use ed25519_dalek::Keypair as DalekKeypair;
+use ed25519_dalek::SigningKey as DalekKeypair;
 use tokio::time::sleep;
 use std::{path::PathBuf, rc::Rc, time::Duration};
 use tracing_subscriber::prelude::*;
@@ -279,10 +279,11 @@ async fn main() -> anyhow::Result<()> {
 
         }
         Commands::UploadString => {
-            let data = tokio::fs::read(&cli.program_authority_path).await.unwrap();
-            let bytes: Vec<u8> = serde_json::from_slice(&data).unwrap();
-            let keypair = DalekKeypair::from_bytes(&bytes).unwrap();
-            tracing::debug!(signer = bs58::encode(&keypair.public.as_ref()).into_string());
+            let mut data = tokio::fs::read(&cli.program_authority_path).await.unwrap();
+            let mut bytes = [0_u8; 64];
+            data.iter_mut().enumerate().for_each(|(i, v)| bytes[i] = *v);
+            let keypair = DalekKeypair::from_keypair_bytes(&bytes).unwrap();
+            tracing::debug!(signer = bs58::encode(&keypair.verifying_key().as_ref()).into_string());
             let signer = Ed25519Signer::new(keypair);
 
             let bundlr = Bundlr::new(
