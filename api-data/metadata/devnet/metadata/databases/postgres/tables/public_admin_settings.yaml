@@ -1,0 +1,16 @@
+table:
+  name: admin_settings
+  schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - burn_promo_token_lamports
+        - create_promo_lamports
+        - slot
+        - write_version
+        - id
+        - platform
+        - created_at
+        - modified_at
+      filter: {}

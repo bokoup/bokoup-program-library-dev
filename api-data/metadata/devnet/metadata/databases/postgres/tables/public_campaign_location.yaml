@@ -1,21 +1,31 @@
 table:
-  name: mint_promo_token
+  name: campaign_location
   schema: public
 object_relationships:
-  - name: mintObject
+  - name: campaignObject
     using:
       manual_configuration:
         column_mapping:
-          mint: id
+          campaign: id
         insertion_order: null
         remote_table:
-          name: mint
+          name: campaign
           schema: public
-  - name: promoObject
+  - name: locationObject
     using:
       manual_configuration:
         column_mapping:
-          promo: id
+          location: id
+        insertion_order: null
+        remote_table:
+          name: location
+          schema: public
+array_relationships:
+  - name: promos
+    using:
+      manual_configuration:
+        column_mapping:
+          campaign: campaign
         insertion_order: null
         remote_table:
           name: promo
@@ -25,18 +35,10 @@ select_permissions:
     permission:
       columns:
         - slot
-        - memo
-        - authority
+        - write_version
         - campaign
-        - campaign_location
-        - device
-        - device_owner
-        - mint
-        - payer
-        - promo
-        - signature
-        - token_account
-        - token_owner
+        - id
+        - location
         - created_at
         - modified_at
       filter: {}

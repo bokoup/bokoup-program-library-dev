@@ -28,8 +28,9 @@ select_permissions:
         - memo
         - authority
         - campaign
+        - campaign_location
         - device
-        - location
+        - device_owner
         - mint
         - payer
         - promo

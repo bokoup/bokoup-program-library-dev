@@ -33,13 +33,17 @@ select_permissions:
   - role: public
     permission:
       columns:
+        - campaign_balance
+        - payer_balance
+        - platform_balance
         - slot
         - memo
         - admin_settings
         - authority
         - campaign
+        - campaign_location
         - device
-        - location
+        - device_owner
         - mint
         - payer
         - platform

@@ -1,7 +1,26 @@
 table:
   name: campaign
   schema: public
+object_relationships:
+  - name: merchantObject
+    using:
+      manual_configuration:
+        column_mapping:
+          merchant: id
+        insertion_order: null
+        remote_table:
+          name: merchant
+          schema: public
 array_relationships:
+  - name: campaignLocations
+    using:
+      manual_configuration:
+        column_mapping:
+          id: campaign
+        insertion_order: null
+        remote_table:
+          name: campaign_location
+          schema: public
   - name: promos
     using:
       manual_configuration:
@@ -15,14 +34,14 @@ select_permissions:
   - role: public
     permission:
       columns:
+        - slot
+        - write_version
+        - active
+        - metadata_json
         - id
         - merchant
         - name
         - uri
-        - locations
-        - active
-        - slot
-        - write_version
         - created_at
         - modified_at
       filter: {}
