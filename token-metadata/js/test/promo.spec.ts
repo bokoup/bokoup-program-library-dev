@@ -36,8 +36,6 @@ describe('promo', () => {
     new Uint8Array(JSON.parse(process.env.MERCHANT_OWNER_KEYPAIR)),
   );
 
-  console.log(merchantOwner.publicKey);
-
   const url = process.env.ANCHOR_PROVIDER_URL;
   if (url === undefined) {
     throw new Error('ANCHOR_PROVIDER_URL is not defined');
@@ -63,6 +61,7 @@ describe('promo', () => {
   console.log('merchantOwner: ', merchantOwner.publicKey.toString());
   console.log('platform: ', platform.publicKey.toString());
   console.log('platformSigner: ', platformSigner.publicKey.toString());
+  console.log('tokenOwner', tokenOwner.toString());
 
   let adminSettings: PublicKey;
   let adminSettingsAccount: AdminSettings;

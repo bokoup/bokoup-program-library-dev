@@ -92,7 +92,7 @@ export class TokenMetadataProgram {
     burnPromoTokenLamports: number,
   ): Promise<PublicKey> {
     const adminSettings = this.findAdminAddress();
-    // const programData = this.findProgramDataAdress();
+    const programData = this.findProgramDataAdress();
 
     await this.program.methods
       .createAdminSettings({
@@ -101,11 +101,10 @@ export class TokenMetadataProgram {
         burnPromoTokenLamports: new BN(burnPromoTokenLamports),
       })
       .accounts({
-        payer: platform.publicKey,
-        // program: this.PUBKEY,
-        // programData,
+        payer: this.payer.publicKey,
+        program: this.PUBKEY,
+        programData,
       })
-      .signers([platform])
       .rpc();
     return adminSettings;
   }

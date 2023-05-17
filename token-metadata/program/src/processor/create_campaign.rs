@@ -11,16 +11,18 @@ impl<'info> CreateCampaign<'info> {
 
         *self.campaign = data;
 
-        transfer_sol(
-            CpiContext::new(
-                self.system_program.to_account_info(),
-                TransferSol {
-                    payer: self.owner.to_account_info(),
-                    to: self.campaign.to_account_info(),
-                },
-            ),
-            lamports,
-        )?;
+        if lamports > 0 {
+            transfer_sol(
+                CpiContext::new(
+                    self.system_program.to_account_info(),
+                    TransferSol {
+                        payer: self.owner.to_account_info(),
+                        to: self.campaign.to_account_info(),
+                    },
+                ),
+                lamports,
+            )?;
+        }
 
         if let Some(memo) = memo {
             let account_infos = vec![self.owner.to_account_info(), self.payer.to_account_info()];

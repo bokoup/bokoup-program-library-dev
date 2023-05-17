@@ -15,6 +15,7 @@ use state::{AdminSettings, Campaign, CampaignLocation, DataV2, Device, Location,
 use utils::{
     ADMIN_PREFIX, AUTHORITY_PREFIX, CAMPAIGN_LOCATION_PREFIX, CAMPAIGN_PREFIX, DEVICE_PREFIX,
     LOCATION_PREFIX, MAX_NAME_LENGTH, MAX_URI_LENGTH, MERCHANT_PREFIX, PROMO_PREFIX,
+    UPGRADE_AUTHORITY,
 };
 
 declare_id!("HB53jiCac5VtNdokJeibrfd1QJsyWWFe56M1TQUSKQfY");
@@ -160,7 +161,7 @@ pub mod bpl_token_metadata {
 // TODO: uncomment prorgram data check when deploying to devnet
 #[derive(Accounts)]
 pub struct CreateAdminSettings<'info> {
-    #[account(mut)]
+    #[account(mut, constraint = &payer.key().to_string() == UPGRADE_AUTHORITY)]
     pub payer: Signer<'info>,
     #[account(init_if_needed, seeds = [ADMIN_PREFIX.as_bytes()], bump, payer = payer, space = AdminSettings::LEN)]
     pub admin_settings: Account<'info, AdminSettings>,
@@ -243,7 +244,7 @@ pub struct CreateDevice<'info> {
     #[account(constraint = location.merchant == merchant.key())]
     pub location: Account<'info, Location>,
     #[account(
-        init,
+        init_if_needed,
         constraint = data.location == location.key(),
         constraint = data.name.len() <= MAX_NAME_LENGTH,
         constraint = data.uri.len() <= MAX_URI_LENGTH,

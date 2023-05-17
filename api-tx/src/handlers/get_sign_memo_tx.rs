@@ -30,6 +30,8 @@ pub async fn handler(
 
     let mut tx = Transaction::new_with_payer(&[instruction], Some(&payer));
     let latest_blockhash = state.solana.get_latest_blockhash().await?;
+    tracing::debug!(latest_blockhash = latest_blockhash.to_string());
+
     tx.try_partial_sign(&[&state.platform_signer], latest_blockhash)?;
     let serialized = bincode::serialize(&tx)?;
     let transaction = base64::encode(serialized);

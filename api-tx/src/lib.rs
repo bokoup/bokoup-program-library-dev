@@ -143,7 +143,7 @@ pub fn create_app(
             get(get_app_id::handler).post(get_create_location_tx::handler),
         )
         .route(
-            "/device/create/:merchant_owner/:location/:owner/",
+            "/device/create/:merchant_owner/:location/:owner",
             get(get_app_id::handler).post(get_create_device_tx::handler),
         )
         .route(

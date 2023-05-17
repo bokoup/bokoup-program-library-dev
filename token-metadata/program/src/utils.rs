@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
 use mpl_token_metadata::{pda::find_metadata_account, state::DataV2};
 
+pub const UPGRADE_AUTHORITY: &str = "61mVTaw6hBtwWnSaGXRSJePFWEQqipeCka3evytEVNUp";
 pub const ADMIN_PREFIX: &str = "admin";
 pub const AUTHORITY_PREFIX: &str = "authority";
 pub const MERCHANT_PREFIX: &str = "merchant";
