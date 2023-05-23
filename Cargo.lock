@@ -510,26 +510,13 @@ dependencies = [
 [[package]]
 name = "anchor-spl"
 version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75cc8066fbd45e0e03edf48342c79265aa34ca76cefeace48ef6c402b6946665"
-dependencies = [
- "anchor-lang 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
- "spl-token-2022 0.5.0",
-]
-
-[[package]]
-name = "anchor-spl"
-version = "0.27.0"
 source = "git+https://github.com/coral-xyz/anchor#67eb7520b5ef738b4990bc44c292cfefcb63412e"
 dependencies = [
  "anchor-lang 0.27.0 (git+https://github.com/coral-xyz/anchor)",
  "solana-program",
  "spl-associated-token-account",
  "spl-token",
- "spl-token-2022 0.6.1",
+ "spl-token-2022",
  "toml_datetime",
  "winnow",
 ]
@@ -1090,7 +1077,7 @@ dependencies = [
 name = "bpl-api-data"
 version = "0.1.0"
 dependencies = [
- "anchor-spl 0.27.0 (git+https://github.com/coral-xyz/anchor)",
+ "anchor-spl 0.27.0",
  "borsh",
  "bpl-token-metadata",
  "bs58 0.4.0",
@@ -1118,8 +1105,8 @@ name = "bpl-api-tx"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
- "anchor-lang 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "anchor-spl 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "anchor-lang 0.27.0 (git+https://github.com/coral-xyz/anchor)",
+ "anchor-spl 0.27.0",
  "axum",
  "base64 0.13.1",
  "bincode",
@@ -1155,7 +1142,7 @@ name = "bpl-indexer"
 version = "0.1.0"
 dependencies = [
  "anchor-lang 0.27.0 (git+https://github.com/coral-xyz/anchor)",
- "anchor-spl 0.27.0 (git+https://github.com/coral-xyz/anchor)",
+ "anchor-spl 0.27.0",
  "bincode",
  "bpl-api-data",
  "bpl-token-metadata",
@@ -1185,7 +1172,7 @@ version = "0.1.0"
 dependencies = [
  "anchor-client",
  "anchor-lang 0.27.0 (git+https://github.com/coral-xyz/anchor)",
- "anchor-spl 0.27.0 (git+https://github.com/coral-xyz/anchor)",
+ "anchor-spl 0.27.0",
  "borsh",
  "mpl-token-metadata",
  "solana-sdk",
@@ -5050,7 +5037,7 @@ dependencies = [
  "solana-sdk",
  "solana-vote-program",
  "spl-token",
- "spl-token-2022 0.6.1",
+ "spl-token-2022",
  "thiserror",
  "zstd",
 ]
@@ -5155,7 +5142,7 @@ dependencies = [
  "solana-transaction-status",
  "solana-version",
  "solana-vote-program",
- "spl-token-2022 0.6.1",
+ "spl-token-2022",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -5555,7 +5542,7 @@ dependencies = [
  "spl-associated-token-account",
  "spl-memo",
  "spl-token",
- "spl-token-2022 0.6.1",
+ "spl-token-2022",
  "thiserror",
 ]
 
@@ -5670,7 +5657,7 @@ dependencies = [
  "num-traits",
  "solana-program",
  "spl-token",
- "spl-token-2022 0.6.1",
+ "spl-token-2022",
  "thiserror",
 ]
 
@@ -5695,24 +5682,6 @@ dependencies = [
  "num-traits",
  "num_enum",
  "solana-program",
- "thiserror",
-]
-
-[[package]]
-name = "spl-token-2022"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0edb869dbe159b018f17fb9bfa67118c30f232d7f54a73742bc96794dff77ed8"
-dependencies = [
- "arrayref",
- "bytemuck",
- "num-derive",
- "num-traits",
- "num_enum",
- "solana-program",
- "solana-zk-token-sdk",
- "spl-memo",
- "spl-token",
  "thiserror",
 ]
 
