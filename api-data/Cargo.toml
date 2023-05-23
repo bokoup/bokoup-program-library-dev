@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anchor-spl = "0.24.2"
+# anchor-spl = "0.27.0"
+anchor-spl = { git = "https://github.com/coral-xyz/anchor" }
 bpl-token-metadata = { path = "../token-metadata/program" }
 borsh = "0.9.3"
 bs58 = "0.4.0"
@@ -13,11 +14,11 @@ dotenv = "0.15"
 futures = "0.3"
 log = "0.4.17"
 mpl-auction-house = { version = "1.1.6", features = ["no-entrypoint"] }
-mpl-token-metadata = { version = "1.2.10", features = [ "no-entrypoint" ]}
-refinery = { version = "0.8.6", features = ["tokio-postgres"] }
+mpl-token-metadata = { version = "1.11.1", features = [ "no-entrypoint" ]}
+refinery = { version = "0.7.0", features = ["tokio-postgres"] }
 reqwest = { version = "0.11.10",  features = ["json"] }
 serde_json = "1.0.68"
-solana-sdk = "1.9.20"
+solana-sdk = "1.14.18"
 spl-token = "3.2.0"
 tokio = { version = "1.18.2", features = ["full"] }
 tokio-postgres = {version = "=0.7.6", features = ["with-serde_json-1"] }
