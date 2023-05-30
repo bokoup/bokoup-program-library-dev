@@ -29,6 +29,9 @@ pub async fn upsert(
         Key::EditionMarker => "EditionMarker",
         Key::UseAuthorityRecord => "UseAuthorityRecord",
         Key::CollectionAuthorityRecord => "CollectionAuthorityRecord",
+        Key::TokenOwnedEscrow => "TokenOwnedEscrow",
+        Key::TokenRecord => "TokenRecord",
+        Key::MetadataDelegate => "MetadataDelegate",
     };
 
     let update_authority = account.update_authority.to_string();
@@ -46,6 +49,7 @@ pub async fn upsert(
         TokenStandard::FungibleAsset => "FungibleAsset",
         TokenStandard::Fungible => "Fungible",
         TokenStandard::NonFungibleEdition => "NonFungibleEdition",
+        TokenStandard::ProgrammableNonFungible => "ProgrammableNonFungible",
     });
 
     let (collection_key, collection_verified) =

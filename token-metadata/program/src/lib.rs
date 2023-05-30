@@ -11,6 +11,7 @@ use anchor_spl::{
     token::{Mint, Token, TokenAccount},
 };
 use borsh::BorshDeserialize;
+use mpl_token_metadata::state::TokenMetadataAccount;
 use state::{AdminSettings, Campaign, CampaignLocation, DataV2, Device, Location, Merchant, Promo};
 use utils::{
     ADMIN_PREFIX, AUTHORITY_PREFIX, CAMPAIGN_LOCATION_PREFIX, CAMPAIGN_PREFIX, DEVICE_PREFIX,
@@ -655,6 +656,15 @@ pub struct Metadata(mpl_token_metadata::state::Metadata);
 
 impl Metadata {
     pub const LEN: usize = mpl_token_metadata::state::MAX_METADATA_LEN;
+}
+
+impl TokenMetadataAccount for Metadata {
+    fn key() -> mpl_token_metadata::state::Key {
+        mpl_token_metadata::state::Key::MetadataV1
+    }
+    fn size() -> usize {
+        mpl_token_metadata::state::MAX_METADATA_LEN
+    }
 }
 
 impl anchor_lang::AccountDeserialize for Metadata {

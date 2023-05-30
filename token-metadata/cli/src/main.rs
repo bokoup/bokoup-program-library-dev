@@ -1,3 +1,6 @@
+use anchor_lang::{
+    InstructionData, ToAccountMetas,
+};
 use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
@@ -8,9 +11,8 @@ use anchor_client::{
     Client, Cluster,
 };
 use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}, utils::{self, find_campaign_address, find_merchant_address}};
-use bundlr_sdk::{tags::Tag, Bundlr, Ed25519Signer};
+use bundlr_sdk::{tags::Tag};
 use clap::{Parser, Subcommand, ArgEnum};
-use ed25519_dalek::SigningKey as DalekKeypair;
 use tokio::time::sleep;
 use std::{path::PathBuf, rc::Rc, time::Duration};
 use tracing_subscriber::prelude::*;
@@ -195,7 +197,7 @@ async fn main() -> anyhow::Result<()> {
                 CommitmentConfig::confirmed(),
             );
 
-            let program = client.program(bpl_token_metadata::id());
+            let program = client.program(bpl_token_metadata::ID);
             let (admin_settings, _) = utils::find_admin_address();
             
             let program_data = utils::find_program_data_address();
@@ -203,11 +205,9 @@ async fn main() -> anyhow::Result<()> {
 
             let tx = program
                 .request()
-                .accounts(bpl_token_metadata::accounts::CreateAdminSettings {
+                .accounts(accounts::CreateAdminSettings {
                     payer,
                     admin_settings,
-                    // program: bpl_token_metadata::id(),
-                    // program_data,
                     system_program: system_program::ID,
                 })
                 .args(instruction::CreateAdminSettings {
@@ -279,19 +279,15 @@ async fn main() -> anyhow::Result<()> {
 
         }
         Commands::UploadString => {
-            let mut data = tokio::fs::read(&cli.program_authority_path).await.unwrap();
-            let mut bytes = [0_u8; 64];
-            data.iter_mut().enumerate().for_each(|(i, v)| bytes[i] = *v);
-            let keypair = DalekKeypair::from_keypair_bytes(&bytes).unwrap();
-            tracing::debug!(signer = bs58::encode(&keypair.verifying_key().as_ref()).into_string());
-            let signer = Ed25519Signer::new(keypair);
+            let currency = bundlr_sdk::currency::solana::SolanaBuilder::new()
+            .wallet(&program_authority_keypair.to_base58_string())
+            .build()
+            .unwrap();
 
-            let bundlr = Bundlr::new(
-                "https://node1.bundlr.network".to_string(),
-                "solana".to_string(),
-                "sol".to_string(),
-                signer,
-            );
+            let bundlr = bundlr_sdk::BundlrBuilder::<bundlr_sdk::currency::solana::Solana>::new()
+            .currency(currency)
+            .build()
+            .unwrap();
 
             let json_data = serde_json::json!({
                 "name": "Test Promo",
@@ -314,13 +310,13 @@ async fn main() -> anyhow::Result<()> {
                 "max_burn": 500
             });
 
-            let tx = bundlr.create_transaction_with_tags(
+            let tx = bundlr.create_transaction(
                 serde_json::to_vec(&json_data).unwrap(),
                 vec![
                     Tag::new("User-Agent".into(), "bokoup".into()),
                     Tag::new("Content-Type".into(), "application/json".into()),
                 ],
-            );
+            ).unwrap();
 
             // Will return Err if not success
             match bundlr.send_transaction(tx).await {

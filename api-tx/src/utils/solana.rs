@@ -478,7 +478,7 @@ pub fn create_sign_memo_instruction(
     })
 }
 
-// Needed to do this since nonblocking client not avaiable in 1.9.20.
+// Needed to do this since nonblocking client not avaiable in 1.14.18.
 pub struct Solana {
     pub cluster: Cluster,
     pub commitment: CommitmentLevel,

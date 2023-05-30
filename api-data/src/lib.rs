@@ -769,6 +769,8 @@ mod tests {
                 remaining: 4,
                 total: 4,
             }),
+            collection_details: None,
+            programmable_config: None,
         };
 
         it_upserts_metadata(&client, metadata_pubkey.as_ref(), &metadata, 42, 1).await;
@@ -812,6 +814,10 @@ mod tests {
             seller_fee_basis_points: 4,
             requires_sign_off: false,
             can_change_sale_price: false,
+            escrow_payment_bump: 254,
+            has_auctioneer: false,
+            auctioneer_address: Pubkey::new_unique(),
+            scopes: [false; 7],
         };
         it_upserts_auction_house(&client, ah_pubkey.as_ref(), &auction_house, 42, 1).await;
 

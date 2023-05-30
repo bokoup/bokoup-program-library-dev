@@ -14,9 +14,9 @@ use crate::{
 use super::PayResponse;
 
 pub async fn handler(
-    Json(data): Json<Data>,
     Path(SignMemoParams { message, memo }): Path<SignMemoParams>,
     Extension(state): Extension<Arc<State>>,
+    Json(data): Json<Data>,
 ) -> Result<Json<PayResponse>, AppError> {
     let signer = Pubkey::from_str(&data.account)?;
     let payer = state.platform_signer.pubkey();

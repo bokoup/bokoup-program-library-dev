@@ -18,9 +18,9 @@ use std::{str::FromStr, sync::Arc};
 use super::{LocationParams, PayResponse};
 
 pub async fn handler(
-    multipart: Multipart,
     Path(LocationParams { owner, memo }): Path<LocationParams>,
     Extension(state): Extension<Arc<State>>,
+    multipart: Multipart,
 ) -> Result<Json<PayResponse>, AppError> {
     let payer = state.platform_signer.pubkey();
 

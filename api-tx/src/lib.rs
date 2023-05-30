@@ -5,8 +5,8 @@ use axum::{
     routing::get,
     Router,
 };
-use bundlr_sdk::{Bundlr, Ed25519Signer};
-use ed25519_dalek::SigningKey as DalekKeypair;
+use base58::ToBase58;
+use bundlr_sdk::currency::Currency;
 use handlers::*;
 use solana_sdk::{commitment_config::CommitmentLevel, pubkey::Pubkey, signer::keypair::Keypair};
 use std::{borrow::Cow, sync::Arc, time::Duration};
@@ -41,7 +41,7 @@ pub struct State {
     pub platform_signer: Keypair,
     pub platform: Pubkey,
     pub solana: Solana,
-    pub bundlr: bundlr_sdk::Bundlr<Ed25519Signer>,
+    pub bundlr: bundlr_sdk::Bundlr<bundlr_sdk::currency::solana::Solana>,
     pub data_url: Url,
 }
 
@@ -52,9 +52,22 @@ impl State {
         platform: Pubkey,
         platform_signer: Keypair,
         data_url: Url,
+        bundlr_pub_info: bundlr_sdk::bundlr::PubInfo,
     ) -> Self {
-        let keypair = DalekKeypair::from_bytes(&platform_signer.secret().to_bytes());
-        let signer = Ed25519Signer::new(keypair);
+        let currency = bundlr_sdk::currency::solana::SolanaBuilder::new()
+            .wallet(&platform_signer.to_base58_string())
+            .build()
+            .unwrap();
+
+        tracing::info!(
+            bundlr_currency_address = currency.get_pub_key().unwrap().as_ref().to_base58(),
+        );
+
+        let bundlr = bundlr_sdk::BundlrBuilder::<bundlr_sdk::currency::solana::Solana>::new()
+            .currency(currency)
+            .pub_info(bundlr_pub_info)
+            .build()
+            .unwrap();
 
         Self {
             platform_signer,
@@ -67,12 +80,7 @@ impl State {
                     .build()
                     .unwrap(),
             },
-            bundlr: Bundlr::new(
-                "https://node1.bundlr.network".to_string(),
-                "solana".to_string(),
-                "sol".to_string(),
-                signer,
-            ),
+            bundlr,
             data_url,
         }
     }
@@ -83,6 +91,7 @@ pub fn create_app(
     platform: Pubkey,
     platform_signer: Keypair,
     data_url: Url,
+    bundlr_pub_info: bundlr_sdk::bundlr::PubInfo,
 ) -> Router {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
@@ -168,6 +177,7 @@ pub fn create_app(
                     platform,
                     platform_signer,
                     data_url,
+                    bundlr_pub_info,
                 ))))
                 .into_inner(),
         )
@@ -201,6 +211,7 @@ pub mod test {
         http::{Method, Request, StatusCode},
     };
     use bpl_token_metadata::utils::{find_campaign_address, find_location_address};
+    use bundlr_sdk::{bundlr::get_pub_info, consts::BUNDLR_DEFAULT_URL, currency::CurrencyType};
     use handlers::PayResponse;
     use solana_sdk::{signature::Signer, transaction::Transaction};
     use std::{
@@ -216,13 +227,14 @@ pub mod test {
     const PLATFORM: &str = "2R7GkXvQQS4iHptUvQMhDvRSNXL8tAuuASNvCYgz3GQW";
     const DATA_URL: &str = "https://shining-sailfish-15.hasura.app/v1/graphql/";
 
-    #[tokio::test]
     pub async fn run_tests() {
+        dotenv::dotenv().ok();
         std::env::set_var("RUST_LOG", "bpl_api_tx=trace");
         tracing_subscriber::registry()
             .with(fmt::layer())
             .with(EnvFilter::from_default_env())
-            .init();
+            .try_init()
+            .unwrap_or(());
         // dotenv::dotenv().ok();
         // fund_accounts().await;
         // test_create_merchant().await;
@@ -231,18 +243,35 @@ pub mod test {
     }
 
     #[tokio::test]
-    async fn test_app_id() {
-        dotenv::dotenv().ok();
+    async fn test_app_id_ding() {
+        run_tests().await;
+
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
 
+        dbg!(platform_signer.pubkey().to_string());
         // ok to be devnet, only pulling blockhash - will succeed even if localnet validator not running
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
+
+        let balance = bundlr_sdk::bundlr::get_balance(
+            &url::Url::from_str(BUNDLR_DEFAULT_URL).unwrap(),
+            CurrencyType::Solana,
+            &platform_signer.pubkey().to_string(),
+            &reqwest::Client::new(),
+        )
+        .await
+        .unwrap();
+
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
             platform_signer,
             Url::from_str(DATA_URL).unwrap(),
+            pub_info,
         );
+
         let mint = Pubkey::new_unique();
         let message = urlencoding::encode(MESSAGE);
         let response = app
@@ -281,15 +310,20 @@ pub mod test {
     // to pay for transaction fees with no further merchant approval required.
     #[tokio::test]
     async fn test_get_mint_promo_tx() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
-            Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
+            platform_signer,
             Url::from_str(DATA_URL).unwrap(),
+            pub_info,
         );
 
         let mint = Pubkey::new_unique();
@@ -337,6 +371,9 @@ pub mod test {
         )
         .unwrap();
 
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
         let instruction = mint_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
@@ -370,15 +407,20 @@ pub mod test {
 
     #[tokio::test]
     async fn test_get_delegate_promo_tx() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
-            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap()),
+            platform_signer,
             Url::from_str(DATA_URL).unwrap(),
+            pub_info,
         );
 
         let mint = Pubkey::new_unique();
@@ -427,6 +469,9 @@ pub mod test {
         )
         .unwrap();
 
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
         let instruction = delegate_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
@@ -458,15 +503,20 @@ pub mod test {
 
     #[tokio::test]
     async fn test_get_burn_delegated_promo_tx() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         let app = create_app(
             Cluster::Devnet,
             Pubkey::from_str(PLATFORM.into()).unwrap(),
-            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap()),
+            platform_signer,
             Url::from_str(DATA_URL).unwrap(),
+            pub_info,
         );
 
         let mint = Pubkey::new_unique();
@@ -515,6 +565,9 @@ pub mod test {
         )
         .unwrap();
 
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
         let instruction = burn_delegated_promo_instruction(
             platform_signer.pubkey(),
             device_owner,
@@ -547,11 +600,29 @@ pub mod test {
 
     #[tokio::test]
     async fn test_sign_memo_tx() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let platform_signer =
             parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
 
         let signer = Keypair::new();
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
+
+        let app = create_app(
+            Cluster::Devnet,
+            Pubkey::from_str(PLATFORM.into()).unwrap(),
+            platform_signer,
+            Url::from_str(DATA_URL).unwrap(),
+            pub_info,
+        );
+
+        let platform_signer =
+            parse_string_to_keypair(&std::env::var("PLATFORM_SIGNER_KEYPAIR").unwrap());
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         let state = State::new(
             Cluster::Localnet,
@@ -559,13 +630,7 @@ pub mod test {
             Pubkey::from_str(PLATFORM.into()).unwrap(),
             Keypair::from_bytes(&platform_signer.to_bytes()).unwrap(),
             Url::from_str(DATA_URL).unwrap(),
-        );
-        // ok to be devnet, only pulling blockhash - will succeed even if localnet validator not running
-        let app = create_app(
-            Cluster::Devnet,
-            Pubkey::from_str(PLATFORM.into()).unwrap(),
-            platform_signer,
-            Url::from_str(DATA_URL).unwrap(),
+            pub_info,
         );
 
         let pre_memo = r#"{"jingus": "amongus"}"#;
@@ -630,7 +695,7 @@ pub mod test {
 
     #[tokio::test]
     async fn test_create_merchant() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let merchant_owner =
             parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
@@ -638,6 +703,10 @@ pub mod test {
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -648,6 +717,7 @@ pub mod test {
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
+                        pub_info,
                     )
                     .into_make_service(),
                 )
@@ -721,7 +791,7 @@ pub mod test {
 
     #[tokio::test]
     async fn test_create_location() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let merchant_owner =
             parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
@@ -729,6 +799,9 @@ pub mod test {
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -739,6 +812,7 @@ pub mod test {
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
+                        pub_info,
                     )
                     .into_make_service(),
                 )
@@ -811,7 +885,7 @@ pub mod test {
 
     #[tokio::test]
     async fn test_create_device() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let merchant_owner =
             parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
@@ -819,6 +893,10 @@ pub mod test {
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -829,6 +907,7 @@ pub mod test {
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
+                        pub_info,
                     )
                     .into_make_service(),
                 )
@@ -887,7 +966,7 @@ pub mod test {
 
     #[tokio::test]
     async fn test_create_campaign() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let merchant_owner =
             parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
@@ -895,6 +974,10 @@ pub mod test {
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         tokio::spawn(async move {
             axum::Server::from_tcp(listener)
@@ -905,6 +988,7 @@ pub mod test {
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
+                        pub_info,
                     )
                     .into_make_service(),
                 )
@@ -965,7 +1049,7 @@ pub mod test {
 
     #[tokio::test]
     async fn test_create_promo() {
-        dotenv::dotenv().ok();
+        run_tests().await;
         let merchant_owner =
             parse_string_to_keypair(&std::env::var("MERCHANT_OWNER_KEYPAIR").unwrap());
         let platform_signer =
@@ -973,6 +1057,10 @@ pub mod test {
 
         let listener = TcpListener::bind("0.0.0.0:0".parse::<SocketAddr>().unwrap()).unwrap();
         let addr = listener.local_addr().unwrap();
+
+        let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+            .await
+            .unwrap();
 
         // ok to be devnet, just getting blockhash for test
         tokio::spawn(async move {
@@ -984,6 +1072,7 @@ pub mod test {
                         Pubkey::from_str(PLATFORM.into()).unwrap(),
                         platform_signer,
                         Url::from_str(DATA_URL).unwrap(),
+                        pub_info,
                     )
                     .into_make_service(),
                 )

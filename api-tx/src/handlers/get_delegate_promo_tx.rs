@@ -15,7 +15,6 @@ use super::PayResponse;
 
 // Payer is distinct from
 pub async fn handler(
-    Json(data): Json<Data>,
     Path(DelegateParams {
         mint,
         device_owner,
@@ -26,6 +25,7 @@ pub async fn handler(
         memo,
     }): Path<DelegateParams>,
     Extension(state): Extension<Arc<State>>,
+    Json(data): Json<Data>,
 ) -> Result<Json<PayResponse>, AppError> {
     let token_owner = Pubkey::from_str(&data.account)?;
     let payer = state.platform_signer.pubkey();

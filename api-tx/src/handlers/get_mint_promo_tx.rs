@@ -7,7 +7,6 @@ use solana_sdk::{signer::Signer, transaction::Transaction};
 use std::{str::FromStr, sync::Arc};
 
 pub async fn handler(
-    Json(data): Json<Data>,
     Path(MintParams {
         mint,
         device,
@@ -18,6 +17,7 @@ pub async fn handler(
         memo,
     }): Path<MintParams>,
     Extension(state): Extension<Arc<State>>,
+    Json(data): Json<Data>,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(
         mint = mint,

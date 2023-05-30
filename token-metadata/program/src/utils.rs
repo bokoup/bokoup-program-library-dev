@@ -43,7 +43,7 @@ pub fn create_metadata_accounts_v2<'a, 'b, 'c, 'info>(
     is_mutable: bool,
     data: DataV2,
 ) -> Result<()> {
-    let ix = mpl_token_metadata::instruction::create_metadata_accounts_v2(
+    let ix = mpl_token_metadata::instruction::create_metadata_accounts_v3(
         mpl_token_metadata::ID.clone(),
         ctx.accounts.metadata_account.to_account_info().key(),
         ctx.accounts.mint.to_account_info().key(),
@@ -59,6 +59,7 @@ pub fn create_metadata_accounts_v2<'a, 'b, 'c, 'info>(
         is_mutable,
         data.collection,
         data.uses,
+        None,
     );
     anchor_lang::solana_program::program::invoke_signed(
         &ix,
