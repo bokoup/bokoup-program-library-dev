@@ -18,7 +18,6 @@ use std::{str::FromStr, sync::Arc};
 use super::{CampaignParams, PayResponse};
 
 pub async fn handler(
-    multipart: Multipart,
     Path(CampaignParams {
         owner,
         lamports,
@@ -26,6 +25,7 @@ pub async fn handler(
         locations,
     }): Path<CampaignParams>,
     Extension(state): Extension<Arc<State>>,
+    multipart: Multipart,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(
         owner = owner,

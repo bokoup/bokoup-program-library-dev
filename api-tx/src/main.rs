@@ -1,5 +1,6 @@
 use anchor_lang::prelude::Pubkey;
 use bpl_api_tx::{create_app, parse_string_to_keypair, utils::solana::Cluster};
+use bundlr_sdk::{bundlr::get_pub_info, consts::BUNDLR_DEFAULT_URL};
 use clap::Parser;
 use solana_sdk::signer::Signer;
 use std::{net::SocketAddr, str::FromStr};
@@ -33,6 +34,10 @@ async fn main() {
 
     let args = Args::parse();
 
+    let pub_info = get_pub_info(&Url::from_str(BUNDLR_DEFAULT_URL).unwrap())
+        .await
+        .unwrap();
+
     let platform_signer = parse_string_to_keypair(&args.platform_signer);
     tracing::debug!(platform_signer = platform_signer.pubkey().to_string());
 
@@ -42,7 +47,13 @@ async fn main() {
     })
     .unwrap();
 
-    let app = create_app(args.cluster, args.platform, platform_signer, data_url);
+    let app = create_app(
+        args.cluster,
+        args.platform,
+        platform_signer,
+        data_url,
+        pub_info,
+    );
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)

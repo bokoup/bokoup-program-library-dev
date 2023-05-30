@@ -12,7 +12,6 @@ use crate::{error::AppError, utils::solana::burn_delegated_promo_instruction, St
 use super::{BurnDelegatedParams, PayResponse};
 
 pub async fn handler(
-    Json(data): Json<Data>,
     Path(BurnDelegatedParams {
         mint,
         token_account,
@@ -23,6 +22,7 @@ pub async fn handler(
         memo,
     }): Path<BurnDelegatedParams>,
     Extension(state): Extension<Arc<State>>,
+    Json(data): Json<Data>,
 ) -> Result<Json<PayResponse>, AppError> {
     let payer = state.platform_signer.pubkey();
     let device_owner = Pubkey::from_str(&data.account)?;

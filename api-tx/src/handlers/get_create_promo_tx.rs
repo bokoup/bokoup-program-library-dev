@@ -17,14 +17,15 @@ use std::{str::FromStr, sync::Arc};
 
 use super::{PayResponse, PromoParams};
 
+#[axum_macros::debug_handler]
 pub async fn handler(
-    multipart: Multipart,
     Path(PromoParams {
         owner,
         campaign,
         memo,
     }): Path<PromoParams>,
     Extension(state): Extension<Arc<State>>,
+    multipart: Multipart,
 ) -> Result<Json<PayResponse>, AppError> {
     tracing::debug!(owner = owner, campaign = campaign, memo = memo,);
 

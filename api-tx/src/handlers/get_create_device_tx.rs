@@ -18,7 +18,6 @@ use std::{str::FromStr, sync::Arc};
 use super::{DeviceParams, PayResponse};
 
 pub async fn handler(
-    multipart: Multipart,
     Path(DeviceParams {
         merchant_owner,
         location,
@@ -26,6 +25,7 @@ pub async fn handler(
         memo,
     }): Path<DeviceParams>,
     Extension(state): Extension<Arc<State>>,
+    multipart: Multipart,
 ) -> Result<Json<PayResponse>, AppError> {
     let payer = state.platform_signer.pubkey();
     // Parse metadata - leaving option of image in the future.

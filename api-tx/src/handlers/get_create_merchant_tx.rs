@@ -18,9 +18,9 @@ use std::{str::FromStr, sync::Arc};
 use super::{MerchantParams, PayResponse};
 
 pub async fn handler(
-    multipart: Multipart,
     Path(MerchantParams { owner, memo }): Path<MerchantParams>,
     Extension(state): Extension<Arc<State>>,
+    multipart: Multipart,
 ) -> Result<Json<PayResponse>, AppError> {
     let payer = state.platform_signer.pubkey();
 
