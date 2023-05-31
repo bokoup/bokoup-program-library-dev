@@ -18,24 +18,6 @@ pub async fn upload_image(
         ],
     )?;
 
-    let balance = bundlr_sdk::bundlr::get_balance(
-        &url::Url::from_str(BUNDLR_DEFAULT_URL).unwrap(),
-        CurrencyType::Solana,
-        &state.platform_signer.pubkey().to_string(),
-        &reqwest::Client::new(),
-    )
-    .await?;
-
-    tracing::debug!(balance = format!("{}", &balance));
-
-    let mut tx = state.bundlr.create_transaction(
-        image_data.0,
-        vec![
-            Tag::new("User-Agent".into(), "bokoup".into()),
-            Tag::new("Content-Type".into(), &image_data.1),
-        ],
-    )?;
-
     state.bundlr.sign_transaction(&mut tx).await?;
 
     // Get id of uploaded image and add to metdata json.
@@ -63,35 +45,6 @@ pub async fn upload_metadata_json(
     state: Arc<State>,
 ) -> Result<(String, Arc<State>), AppError> {
     // Upload json metadata to Arweave and get id back for inclusion in creation of on chain Promo.
-    let mut tx = state.bundlr.create_transaction(
-        serde_json::to_vec(metadata_data_obj)?,
-        vec![
-            Tag::new("User-Agent".into(), "bokoup".into()),
-            Tag::new("Content-Type".into(), "application/json"),
-        ],
-    )?;
-
-    let balance = bundlr_sdk::bundlr::get_balance(
-        &url::Url::from_str(BUNDLR_DEFAULT_URL).unwrap(),
-        CurrencyType::Solana,
-        &state.platform_signer.pubkey().to_string(),
-        &reqwest::Client::new(),
-    )
-    .await?;
-
-    let price = bundlr_sdk::bundlr::get_price(
-        &url::Url::from_str(BUNDLR_DEFAULT_URL).unwrap(),
-        CurrencyType::Solana,
-        &reqwest::Client::new(),
-        tx.as_bytes().unwrap().len() as u64,
-    )
-    .await?;
-
-    tracing::debug!(
-        balance = format!("{}", &balance),
-        // price = format!("{}", &price)
-    );
-
     let mut tx = state.bundlr.create_transaction(
         serde_json::to_vec(metadata_data_obj)?,
         vec![

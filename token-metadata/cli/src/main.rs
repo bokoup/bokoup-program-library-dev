@@ -1,6 +1,9 @@
 use anchor_lang::{
     InstructionData, ToAccountMetas,
 };
+
+use ed25519_dalek::Keypair as DalekKeypair;
+
 use anchor_client::{
     solana_sdk::{
         commitment_config::CommitmentConfig,
@@ -14,7 +17,7 @@ use bpl_token_metadata::{instruction, accounts, state::{AdminSettings, Campaign}
 use bundlr_sdk::{tags::Tag};
 use clap::{Parser, Subcommand, ArgEnum};
 use tokio::time::sleep;
-use std::{path::PathBuf, rc::Rc, time::Duration};
+use std::{path::PathBuf, rc::Rc, time::Duration, str::FromStr};
 use tracing_subscriber::prelude::*;
 
 #[derive(ArgEnum, Clone, Debug)]
@@ -279,13 +282,17 @@ async fn main() -> anyhow::Result<()> {
 
         }
         Commands::UploadString => {
+            let wallet = DalekKeypair::from_bytes(&platform_signer_keypair.to_bytes()).unwrap();
+            
             let currency = bundlr_sdk::currency::solana::SolanaBuilder::new()
-            .wallet(&program_authority_keypair.to_base58_string())
+            .wallet(&bs58::encode(wallet.to_bytes()).into_string())
             .build()
             .unwrap();
 
             let bundlr = bundlr_sdk::BundlrBuilder::<bundlr_sdk::currency::solana::Solana>::new()
             .currency(currency)
+            .url(url::Url::from_str(bundlr_sdk::consts::BUNDLR_DEFAULT_URL).unwrap())
+            .fetch_pub_info().await.unwrap()
             .build()
             .unwrap();
 
@@ -310,13 +317,15 @@ async fn main() -> anyhow::Result<()> {
                 "max_burn": 500
             });
 
-            let tx = bundlr.create_transaction(
+            let mut tx = bundlr.create_transaction(
                 serde_json::to_vec(&json_data).unwrap(),
                 vec![
                     Tag::new("User-Agent".into(), "bokoup".into()),
                     Tag::new("Content-Type".into(), "application/json".into()),
                 ],
             ).unwrap();
+
+            bundlr.sign_transaction(&mut tx).await?;
 
             // Will return Err if not success
             match bundlr.send_transaction(tx).await {
