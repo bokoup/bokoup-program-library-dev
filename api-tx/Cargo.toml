@@ -7,9 +7,9 @@ edition = "2021"
 
 [dependencies]
 # anchor-lang = "0.27.0"
-anchor-lang = {  git = "https://github.com/coral-xyz/anchor", features= ["init-if-needed"]  }
+anchor-lang = {  version = "0.26.0", features= ["init-if-needed"]  }
 # anchor-spl = "0.27.0"
-anchor-spl = { git = "https://github.com/coral-xyz/anchor" }
+anchor-spl = { version = "0.26.0" }
 axum = {version = "0.6.18", features = ["multipart"] }
 axum-macros = {version = "0.3.7"}
 base58 = "0.2.0"

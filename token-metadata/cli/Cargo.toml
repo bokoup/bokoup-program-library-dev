@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anchor-client = { git = "https://github.com/coral-xyz/anchor" }
-anchor-lang = { git = "https://github.com/coral-xyz/anchor" }
+anchor-client = { version = "0.26.0" }
+anchor-lang = { version = "0.26.0" }
 anyhow = "1.0.58"
 bs58 = "0.4.0"
 bpl-api-tx = { path = "../../api-tx"}

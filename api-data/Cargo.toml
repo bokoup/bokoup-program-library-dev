@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # anchor-spl = "0.27.0"
-anchor-spl = { git = "https://github.com/coral-xyz/anchor" }
+anchor-spl = { version = "0.26.0" }
 bpl-token-metadata = { path = "../token-metadata/program" }
 borsh = "0.9.3"
 bs58 = "0.4.0"
@@ -13,7 +13,7 @@ clap = { version="3.2.22", features=["derive"] }
 dotenv = "0.15"
 futures = "0.3"
 log = "0.4.17"
-mpl-auction-house = { version = "1.1.6", features = ["no-entrypoint"] }
+mpl-auction-house = { version = "1.4.1", features = ["no-entrypoint"] }
 mpl-token-metadata = { version = "1.11.1", features = [ "no-entrypoint" ]}
 refinery = { version = "0.7.0", features = ["tokio-postgres"] }
 reqwest = { version = "0.11.10",  features = ["json"] }
